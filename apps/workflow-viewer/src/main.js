@@ -399,6 +399,103 @@ function normalizeMarkdownInput(content) {
   return content;
 }
 
+/** @param {Element} node */
+function getMermaidNodeKey(node) {
+  return node.id.replace(/^flowchart-/u, "").replace(/-\d+$/u, "");
+}
+
+/**
+ * @param {string} edgeId
+ * @param {string[]} nodeKeys
+ */
+function getMermaidEdgeEnds(edgeId, nodeKeys) {
+  const edgeKey = edgeId.replace(/^L_/u, "").replace(/_\d+$/u, "");
+  for (const source of nodeKeys) {
+    for (const target of nodeKeys) {
+      if (`${source}_${target}` === edgeKey) return { source, target };
+    }
+  }
+  return undefined;
+}
+
+/** @param {Element} container */
+function prepareInteractiveDiagram(container) {
+  const nodes = Array.from(container.querySelectorAll(".node"));
+  const nodeKeys = nodes.map(getMermaidNodeKey);
+
+  for (const node of nodes) {
+    node.setAttribute("data-workflow-node", getMermaidNodeKey(node));
+    if (node.classList.contains("proc")) {
+      node.setAttribute("role", "button");
+      node.setAttribute("tabindex", "0");
+      node.setAttribute("aria-pressed", "false");
+    }
+  }
+
+  for (const edge of container.querySelectorAll("path[data-edge='true']")) {
+    const edgeId = edge.getAttribute("data-id") ?? edge.id;
+    const ends = getMermaidEdgeEnds(edgeId, nodeKeys);
+    if (!ends) continue;
+    edge.setAttribute("data-workflow-source", ends.source);
+    edge.setAttribute("data-workflow-target", ends.target);
+  }
+
+  container.classList.add("is-interactive");
+}
+
+function clearDiagramHighlight() {
+  for (const diagram of preview.querySelectorAll(
+    ".mermaid-diagram.is-highlighted",
+  )) {
+    diagram.classList.remove("is-highlighted");
+    for (const element of diagram.querySelectorAll(
+      ".is-selected, .is-related",
+    )) {
+      element.classList.remove("is-selected", "is-related");
+    }
+    for (const node of diagram.querySelectorAll(".node.proc[aria-pressed]")) {
+      node.setAttribute("aria-pressed", "false");
+    }
+  }
+}
+
+/**
+ * @param {Element} diagram
+ * @param {Element} selectedNode
+ */
+function highlightDiagramNeighborhood(diagram, selectedNode) {
+  clearDiagramHighlight();
+  const selectedKey = selectedNode.getAttribute("data-workflow-node");
+  if (!selectedKey) return;
+
+  diagram.classList.add("is-highlighted");
+  selectedNode.classList.add("is-selected");
+  selectedNode.setAttribute("aria-pressed", "true");
+
+  for (const edge of diagram.querySelectorAll(
+    "path[data-workflow-source][data-workflow-target]",
+  )) {
+    const source = edge.getAttribute("data-workflow-source");
+    const target = edge.getAttribute("data-workflow-target");
+    if (source !== selectedKey && target !== selectedKey) continue;
+
+    edge.classList.add("is-related");
+    const neighborKey = source === selectedKey ? target : source;
+    for (const node of diagram.querySelectorAll("[data-workflow-node]")) {
+      if (node.getAttribute("data-workflow-node") === neighborKey) {
+        node.classList.add("is-related");
+      }
+    }
+
+    const edgeId = edge.getAttribute("data-id") ?? edge.id;
+    for (const label of diagram.querySelectorAll(".edgeLabel [data-id]")) {
+      if (label.getAttribute("data-id") === edgeId) {
+        label.closest(".edgeLabel")?.classList.add("is-related");
+      }
+    }
+  }
+}
+
 /**
  * @param {string} markdown
  * @param {StatusMode} successMode
@@ -441,6 +538,7 @@ async function renderMarkdown(markdown, successMode, successTime) {
         container.className = "mermaid-diagram";
         container.insertAdjacentHTML("afterbegin", rendered.svg);
         rendered.bindFunctions?.(container);
+        prepareInteractiveDiagram(container);
         pre.replaceWith(container);
       } catch (problem) {
         blockErrors.push(problem);
@@ -621,6 +719,32 @@ printButton.addEventListener("click", () => {
   document.title = currentStem;
   updatePrintOrientation();
   window.print();
+});
+
+document.addEventListener("click", (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) {
+    clearDiagramHighlight();
+    return;
+  }
+  const selectedNode = target.closest(".mermaid-diagram .node.proc");
+  const diagram = selectedNode?.closest(".mermaid-diagram");
+  if (selectedNode && diagram) {
+    highlightDiagramNeighborhood(diagram, selectedNode);
+    return;
+  }
+  clearDiagramHighlight();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  const selectedNode = target.closest(".mermaid-diagram .node.proc");
+  const diagram = selectedNode?.closest(".mermaid-diagram");
+  if (!selectedNode || !diagram) return;
+  event.preventDefault();
+  highlightDiagramNeighborhood(diagram, selectedNode);
 });
 
 codeEditor.onDidChangeModelContent(() => {

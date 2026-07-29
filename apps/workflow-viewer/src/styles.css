@@ -345,6 +345,10 @@
     margin: auto;
   }
 
+  .mermaid-diagram.is-interactive .node.proc {
+    cursor: pointer;
+  }
+
   .error-panel {
     width: min(100%, 620px);
     margin: 0 auto 24px;
@@ -448,6 +452,33 @@
   .button:disabled {
     cursor: not-allowed;
     opacity: 0.45;
+  }
+
+  .mermaid-diagram .node,
+  .mermaid-diagram path[data-edge="true"],
+  .mermaid-diagram .edgeLabels > .edgeLabel {
+    transition:
+      opacity 140ms ease,
+      filter 140ms ease;
+  }
+
+  .mermaid-diagram.is-highlighted .node,
+  .mermaid-diagram.is-highlighted path[data-edge="true"],
+  .mermaid-diagram.is-highlighted .edgeLabels > .edgeLabel {
+    opacity: 0.16;
+  }
+
+  .mermaid-diagram.is-highlighted .node.is-selected,
+  .mermaid-diagram.is-highlighted .node.is-related,
+  .mermaid-diagram.is-highlighted path[data-edge="true"].is-related,
+  .mermaid-diagram.is-highlighted .edgeLabels > .edgeLabel.is-related {
+    opacity: 1;
+  }
+
+  .mermaid-diagram .node.is-selected,
+  .mermaid-diagram .node.proc:focus-visible {
+    outline: none;
+    filter: drop-shadow(0 0 5px rgb(1 87 155 / 55%));
   }
 
   .mermaid-block-error {
@@ -579,6 +610,13 @@
       height: auto !important;
       max-width: 100%;
       max-height: 235mm;
+    }
+
+    .mermaid-diagram .node,
+    .mermaid-diagram path[data-edge="true"],
+    .mermaid-diagram .edgeLabels > .edgeLabel {
+      opacity: 1 !important;
+      filter: none !important;
     }
   }
 }
