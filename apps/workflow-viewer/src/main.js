@@ -1,6 +1,7 @@
 import {
   choosePrintOrientation,
   filenameStem,
+  hasExceededPanThreshold,
   isMarkdownFilename,
 } from "./workflow.js";
 import {
@@ -890,15 +891,18 @@ function prepareDiagramViewport(container) {
     state.scrollStartLeft = previewStage.scrollLeft;
     state.scrollStartTop = previewStage.scrollTop;
     state.moved = false;
-    viewport.setPointerCapture(event.pointerId);
-    viewport.classList.add("is-panning");
   });
 
   viewport.addEventListener("pointermove", (event) => {
     if (event.pointerId !== state.pointerId) return;
     const deltaX = event.clientX - state.pointerStartX;
     const deltaY = event.clientY - state.pointerStartY;
-    if (Math.abs(deltaX) + Math.abs(deltaY) > 3) state.moved = true;
+    if (!state.moved) {
+      if (!hasExceededPanThreshold(deltaX, deltaY)) return;
+      state.moved = true;
+      viewport.setPointerCapture(event.pointerId);
+      viewport.classList.add("is-panning");
+    }
     previewStage.scrollLeft = state.scrollStartLeft - deltaX;
     previewStage.scrollTop = state.scrollStartTop - deltaY;
   });
