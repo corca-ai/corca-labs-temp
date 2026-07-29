@@ -28,6 +28,7 @@ const MERMAID_URL =
 const POLL_INTERVAL_MS = 1_500;
 const EDIT_DELAY_MS = 220;
 const HASH_DELAY_MS = 320;
+const VIEW_MODE_STORAGE_KEY = "workflow-viewer:view-mode";
 const DEFAULT_CODE = `# 문의 처리 흐름
 
 \`\`\`mermaid
@@ -56,6 +57,9 @@ const COPY = {
   ko: {
     title: "워크플로 뷰어",
     description: "Mermaid를 지원하는 Markdown 문서를 편집하고 실시간으로 미리 보세요.",
+    viewModeLabel: "보기 모드",
+    splitView: "분할",
+    viewerView: "미리보기만",
     languageLabel: "언어 선택",
     open: "MD 파일 불러오기",
     refresh: "새로고침",
@@ -100,6 +104,9 @@ const COPY = {
   en: {
     title: "Workflow viewer",
     description: "Edit and preview Markdown with Mermaid diagram support.",
+    viewModeLabel: "View mode",
+    splitView: "Split",
+    viewerView: "Viewer only",
     languageLabel: "Choose language",
     open: "Load MD file",
     refresh: "Refresh",
@@ -144,6 +151,7 @@ const COPY = {
 };
 
 /** @typedef {"ko" | "en"} Language */
+/** @typedef {"split" | "viewer"} ViewMode */
 /** @typedef {"live" | "urlError" | "sizeBlocked" | "watching" | "fallback" | "attention" | "accessPaused"} StatusMode */
 
 const get = {
@@ -156,6 +164,11 @@ const get = {
 const documentTitle = get.element("#document-title");
 const pageDescription =
   /** @type {HTMLMetaElement} */ (document.querySelector("#page-description"));
+const viewSwitch = get.element("#view-switch");
+const viewOptions =
+  /** @type {NodeListOf<HTMLButtonElement>} */ (
+    document.querySelectorAll(".view-option")
+  );
 const languageSwitch = get.element("#language-switch");
 const languageOptions =
   /** @type {NodeListOf<HTMLButtonElement>} */ (
@@ -222,6 +235,17 @@ let currentStem = "workflow";
 let currentFilename = "";
 /** @type {string | undefined} */
 let programmaticEditorValue;
+/** @type {ViewMode} */
+let activeViewMode = (() => {
+  try {
+    return localStorage.getItem(VIEW_MODE_STORAGE_KEY) === "viewer"
+      ? "viewer"
+      : "split";
+  } catch {
+    return "split";
+  }
+})();
+document.documentElement.dataset.viewMode = activeViewMode;
 /** @type {"default" | "working" | "success" | "error"} */
 let copyActionState = "default";
 /** @type {"default" | "working" | "success" | "error"} */
@@ -253,6 +277,28 @@ const codeEditor = monaco.editor.create(editorHost, {
   hideCursorInOverviewRuler: true,
   accessibilitySupport: "auto",
 });
+
+function updateViewModeUi() {
+  document.documentElement.dataset.viewMode = activeViewMode;
+  for (const option of viewOptions) {
+    option.setAttribute(
+      "aria-pressed",
+      String(option.dataset.viewMode === activeViewMode),
+    );
+  }
+  window.requestAnimationFrame(() => codeEditor.layout());
+}
+
+/** @param {ViewMode} mode */
+function setViewMode(mode) {
+  activeViewMode = mode;
+  try {
+    localStorage.setItem(VIEW_MODE_STORAGE_KEY, mode);
+  } catch {
+    // The mode still applies for this page when storage is unavailable.
+  }
+  updateViewModeUi();
+}
 
 /** @param {string} value */
 function setEditorValue(value) {
@@ -322,6 +368,11 @@ function applyTranslations() {
   const copy = COPY[activeLanguage];
   document.documentElement.lang = activeLanguage;
   pageDescription.content = copy.description;
+  viewSwitch.setAttribute("aria-label", copy.viewModeLabel);
+  for (const option of viewOptions) {
+    option.textContent =
+      option.dataset.viewMode === "viewer" ? copy.viewerView : copy.splitView;
+  }
   languageSwitch.setAttribute("aria-label", copy.languageLabel);
   openButton.textContent = copy.open;
   refreshButton.textContent = fileHandle ? copy.refresh : copy.chooseAgain;
@@ -957,6 +1008,17 @@ languageSwitch.addEventListener("click", (event) => {
   applyTranslations();
 });
 
+viewSwitch.addEventListener("click", (event) => {
+  const button =
+    event.target instanceof Element
+      ? event.target.closest("[data-view-mode]")
+      : null;
+  if (!(button instanceof HTMLButtonElement)) return;
+  const mode = button.dataset.viewMode;
+  if (mode !== "split" && mode !== "viewer") return;
+  setViewMode(mode);
+});
+
 openButton.addEventListener("click", () => void chooseFile());
 refreshButton.addEventListener("click", () => {
   if (fileHandle) void readHandle();
@@ -1140,3 +1202,4 @@ try {
 }
 
 applyTranslations();
+updateViewModeUi();

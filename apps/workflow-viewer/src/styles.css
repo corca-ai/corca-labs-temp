@@ -82,6 +82,7 @@
     margin-right: auto;
   }
 
+  .view-switch,
   .language-switch {
     display: flex;
     flex: none;
@@ -112,6 +113,18 @@
   .viewer-panel {
     grid-template-rows: auto 1fr;
     background: var(--color-preview);
+  }
+
+  html[data-view-mode="viewer"] .workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  html[data-view-mode="viewer"] .editor-panel {
+    display: none;
+  }
+
+  html[data-view-mode="viewer"] .markdown-preview {
+    width: min(100%, 1100px);
   }
 
   .pane-header {
@@ -147,6 +160,7 @@
 }
 
 @layer components {
+  .view-switch,
   .language-switch {
     gap: 0;
     padding: 3px;
@@ -154,6 +168,7 @@
     border-radius: var(--radius-control);
   }
 
+  .view-option,
   .language-option {
     min-height: 32px;
     padding: 0 9px;
@@ -422,6 +437,7 @@
 }
 
 @layer states {
+  .view-option[aria-pressed="true"],
   .language-option[aria-pressed="true"] {
     color: #23332e;
     background: var(--color-paper);
@@ -439,6 +455,7 @@
   }
 
   .button:focus-visible,
+  .view-option:focus-visible,
   .language-option:focus-visible,
   .editor-host:focus-within {
     outline: 3px solid rgb(15 126 110 / 24%);
@@ -524,6 +541,10 @@
       position: absolute;
       top: 13px;
       right: 15px;
+    }
+
+    .view-switch {
+      width: max-content;
     }
 
     .pane-header {
