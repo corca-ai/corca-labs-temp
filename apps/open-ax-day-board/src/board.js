@@ -19,7 +19,7 @@ const people = [
 
 const stage=document.querySelector("#stage"), drawer=document.querySelector("#drawer"), content=document.querySelector("#drawerContent");
 const search=document.querySelector("#search"), toast=document.querySelector("#toast"), empty=document.querySelector("#empty");
-let state={positions:{},groups:{},groupLabels:{},groupColors:{},notes:{},showNotes:false,autoArrange:false,history:[],dragStart:null,moved:false,selected:null};
+let state={positions:{},groups:{},groupLabels:{},groupColors:{},notes:{},nickname:"",showNotes:false,autoArrange:false,history:[],dragStart:null,moved:false,selected:null};
 let noteReflowTimer;
 const groupPalette=["#087f8c","#7656c9","#d74878","#d27a16","#2878c8","#6b9838","#d14d3f","#0b91b8","#9b5b32","#5966b3"];
 const layoutToken=name=>parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name))||0;
@@ -50,7 +50,7 @@ function initialPositions(){
   const rowStep=cardH()+layoutToken("--card-gap-y");
   people.forEach((p,i)=>{ const col=i%cols,row=Math.floor(i/cols); state.positions[p.id]={x:24+col*columnStep,y:28+row*rowStep}; });
 }
-function snapshot(){ return JSON.stringify({positions:state.positions,groups:state.groups,groupLabels:state.groupLabels,groupColors:state.groupColors,notes:state.notes,showNotes:state.showNotes,autoArrange:state.autoArrange}); }
+function snapshot(){ return JSON.stringify({positions:state.positions,groups:state.groups,groupLabels:state.groupLabels,groupColors:state.groupColors,notes:state.notes,nickname:state.nickname,showNotes:state.showNotes,autoArrange:state.autoArrange}); }
 function pushHistory(s){ if(state.history.at(-1)!==s){state.history.push(s);if(state.history.length>30)state.history.shift();} }
 function save(){
   const serialized=snapshot();
@@ -88,6 +88,7 @@ function load(){
       state.groupLabels=s.groupLabels||{};
       state.groupColors=s.groupColors||{};
       state.notes=s.notes||{};
+      state.nickname=typeof s.nickname==="string"?s.nickname.slice(0,60):"";
       state.showNotes=Boolean(s.showNotes);
       state.autoArrange=Boolean(s.autoArrange);
       [...new Set(Object.values(state.groups))].forEach(g=>{
@@ -321,7 +322,7 @@ function markdownText(value){
   return String(value||"").replace(/([\\`*_[\]<>])/g,"\\$1").replace(/\n+/g," ");
 }
 function exportMarkdown(){
-  const lines=["# Open AX Day · People Canvas","","현재 캔버스의 그룹 구성입니다.",""];
+  const lines=[`# ${markdownText(state.nickname)||"Open AX Day · People Canvas"}`,"","현재 캔버스의 그룹 구성입니다.",""];
   const groupIds=[...new Set(Object.values(state.groups))];
   groupIds.forEach((g,index)=>{
     const ids=groupMembers(g);
@@ -362,7 +363,7 @@ function exportJson(){
     schema:"open-ax-day-people-canvas/v1",
     exportedAt:new Date().toISOString(),
     participants:people.map(({id,name,company})=>({id,name,company})),
-    board:{positions:state.positions,groups:state.groups,groupLabels:state.groupLabels,groupColors:state.groupColors,notes:state.notes,showNotes:state.showNotes,autoArrange:state.autoArrange}
+    board:{positions:state.positions,groups:state.groups,groupLabels:state.groupLabels,groupColors:state.groupColors,notes:state.notes,nickname:state.nickname,showNotes:state.showNotes,autoArrange:state.autoArrange}
   };
   downloadFile("open-ax-day-board.json",JSON.stringify(payload,null,2),"application/json;charset=utf-8");
   showToast("JSON 파일을 내보냈어요");
@@ -400,7 +401,7 @@ async function importJsonFile(file){
       const note=payload.board.notes?.[p.id];
       if(typeof note==="string"&&note.trim())notes[p.id]=note.slice(0,20000);
     });
-    pushHistory(snapshot());state.positions=positions;state.groups=groups;state.groupLabels=groupLabels;state.groupColors=groupColors;state.notes=notes;state.showNotes=Boolean(payload.board.showNotes);state.autoArrange=Boolean(payload.board.autoArrange);
+    pushHistory(snapshot());state.positions=positions;state.groups=groups;state.groupLabels=groupLabels;state.groupColors=groupColors;state.notes=notes;state.nickname=typeof payload.board.nickname==="string"?payload.board.nickname.slice(0,60):"";state.showNotes=Boolean(payload.board.showNotes);state.autoArrange=Boolean(payload.board.autoArrange);
     ensureGroupLabels();
     applyNotesVisibility();applyAutoArrangeSetting();
     settleLayoutChange("JSON에서 보드 상태와 메모를 가져왔어요");
@@ -441,6 +442,12 @@ function filter(){
   document.querySelector("#count").textContent=`${visible} ${visible===1?"person":"people"}`;empty.classList.toggle("show",visible===0);
 }
 let toastTimer;function showToast(msg){toast.textContent=msg;toast.classList.add("show");clearTimeout(toastTimer);toastTimer=setTimeout(()=>toast.classList.remove("show"),1800)}
+addEventListener("board:toast",e=>showToast(String(e.detail||"")));
+addEventListener("board:set-nickname",e=>{
+  const nickname=String(e.detail||"").slice(0,60);
+  if(state.nickname===nickname)return;
+  state.nickname=nickname;save();
+});
 
 interact(".person").draggable({
   ignoreFrom:".card-note",

@@ -28,6 +28,30 @@
       <button class="icon-btn" id="undo" title="마지막 이동 또는 그룹 변경 실행 취소" aria-label="실행 취소">↶ <span class="label">Undo</span></button>
       <button class="icon-btn" id="reset" title="보드 초기화" aria-label="보드 초기화">↺ <span class="label">Reset</span></button>
     </div>
+    <details class="workspace" id="workspaceMenu">
+      <summary class="sync-status" id="syncStatus" role="status" aria-live="polite">Local only</summary>
+      <div class="workspace-popover">
+        <b id="workspaceTitle">Local workspace</b>
+        <p id="workspaceDescription">Changes stay in this browser.</p>
+        <label class="nickname-field">
+          <span>Board nickname</span>
+          <input id="boardNickname" type="text" maxlength="60" placeholder="Untitled board" autocomplete="off">
+        </label>
+        <div class="workspace-actions">
+          <button type="button" id="saveCloud" hidden>Save to cloud</button>
+          <button type="button" id="publishCloud" hidden>Publish to cloud</button>
+          <button type="button" id="openDraft" hidden>Open local draft</button>
+          <button type="button" id="viewCloud" hidden>View cloud state</button>
+          <button type="button" id="pullCloud" hidden>Load latest cloud</button>
+          <button type="button" id="restoreBackup" hidden>Restore local backup</button>
+          <button type="button" id="newLocal">New local workspace</button>
+        </div>
+        <section class="recent-workspaces" id="recentSection" hidden>
+          <b>Recent workspaces</b>
+          <div id="recentWorkspaces"></div>
+        </section>
+      </div>
+    </details>
   </header>
   <dialog class="random-dialog" id="randomDialog">
     <form class="random-form" id="randomForm">
@@ -37,6 +61,17 @@
       <div class="dialog-actions">
         <button type="button" id="cancelRandom">취소</button>
         <button class="primary" type="submit">그룹 만들기</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog class="conflict-dialog" id="conflictDialog">
+    <form method="dialog" class="conflict-form">
+      <h2>Cloud state changed</h2>
+      <p>Someone saved this board after your local draft began. Choose which state to keep.</p>
+      <div class="conflict-actions">
+        <button value="cancel">Cancel</button>
+        <button value="pull">Load latest cloud</button>
+        <button class="danger" value="overwrite">Overwrite cloud</button>
       </div>
     </form>
   </dialog>

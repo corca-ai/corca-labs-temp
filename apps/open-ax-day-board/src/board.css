@@ -10,9 +10,31 @@
     :root.notes-visible { --card-height:224px; }
     * { box-sizing:border-box }
     #app { width:100%; height:100% }
-    .sync-status { order:5; flex:0 0 88px; width:88px; box-sizing:border-box; padding:6px 7px; border-radius:99px; background:#e6e0d5; color:var(--muted); font-size:10px; font-weight:800; text-align:center; white-space:nowrap }
-    .sync-status[data-status="synced"] { background:#d8eee8; color:#087467 }
+    .workspace { position:relative; order:5; flex:0 0 88px }
+    .workspace > summary { list-style:none; cursor:pointer }
+    .workspace > summary::-webkit-details-marker { display:none }
+    .sync-status { display:block; width:88px; box-sizing:border-box; padding:6px 7px; border-radius:99px; background:#e6e0d5; color:var(--muted); font-size:10px; font-weight:800; text-align:center; white-space:nowrap }
+    .sync-status[data-status="cloud"] { background:#d8eee8; color:#087467 }
+    .sync-status[data-status="draft"] { background:#fff0c9; color:#8c5d00 }
+    .sync-status[data-status="local"] { background:#e6e0d5; color:var(--muted) }
     .sync-status[data-status="offline"] { background:#f9e2d6; color:#a34425 }
+    .workspace[open] .sync-status { box-shadow:0 0 0 3px rgba(10,132,117,.12) }
+    .workspace-popover { position:absolute; top:36px; right:0; z-index:70; width:244px; padding:15px; border:1px solid var(--line); border-radius:14px; background:var(--panel); box-shadow:var(--shadow) }
+    .workspace-popover > b { display:block; font-size:13px }
+    .workspace-popover > p { margin:5px 0 13px; color:var(--muted); font-size:10px; line-height:1.45 }
+    .nickname-field { display:grid; gap:5px; margin-bottom:12px; color:var(--muted); font-size:9px; font-weight:800; letter-spacing:.05em; text-transform:uppercase }
+    .nickname-field input { width:100%; height:36px; padding:0 10px; border:1px solid var(--line); border-radius:9px; outline:none; background:#fff; color:var(--ink); font-size:12px; font-weight:650; letter-spacing:normal; text-transform:none }
+    .nickname-field input:focus { border-color:var(--teal); box-shadow:0 0 0 3px rgba(10,132,117,.12) }
+    .workspace-actions { display:grid; gap:6px }
+    .workspace-actions button { min-height:35px; padding:7px 10px; border:1px solid var(--line); border-radius:9px; background:#fff; cursor:pointer; font-size:11px; font-weight:750; text-align:left }
+    .workspace-actions button:hover { border-color:var(--teal); background:#f0f7f4 }
+    .workspace-actions button[hidden] { display:none }
+    .recent-workspaces { margin-top:14px; padding-top:12px; border-top:1px solid var(--line) }
+    .recent-workspaces > b { display:block; margin-bottom:7px; color:var(--muted); font-size:9px; letter-spacing:.08em; text-transform:uppercase }
+    .recent-workspaces a { display:flex; justify-content:space-between; gap:8px; padding:7px 8px; border-radius:8px; color:var(--ink); font-size:10px; text-decoration:none }
+    .recent-workspaces a:hover { background:#efebe2 }
+    .recent-workspaces a span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+    .recent-workspaces a small { flex:0 0 auto; color:var(--muted); font-size:8px; text-transform:uppercase }
     .boot-failure { min-height:100vh; display:grid; place-content:center; gap:10px; padding:32px; text-align:center }
     .boot-failure h1,.boot-failure p { margin:0 }.boot-failure p { color:var(--muted) }
     .boot-failure button { justify-self:center; margin-top:10px; padding:10px 14px; border:1px solid var(--line); border-radius:10px; background:var(--panel); cursor:pointer }
@@ -103,7 +125,7 @@
     .setting-row input:checked + .switch::after { transform:translateX(15px) }
     .setting-row input:focus-visible + .switch { outline:2px solid var(--teal); outline-offset:3px }
     .random-dialog { width:min(390px,calc(100% - 32px)); padding:0; border:1px solid var(--line); border-radius:18px; background:var(--panel); color:var(--ink); box-shadow:var(--shadow) }
-    .random-dialog::backdrop { background:rgba(20,35,31,.38); backdrop-filter:blur(3px) }
+    .random-dialog::backdrop,.conflict-dialog::backdrop { background:rgba(20,35,31,.38); backdrop-filter:blur(3px) }
     .random-form { padding:24px }
     .random-form h2 { margin:0; font-size:22px; letter-spacing:-.04em }
     .random-form > p { margin:7px 0 20px; color:var(--muted); font-size:12px; line-height:1.5 }
@@ -113,6 +135,13 @@
     .dialog-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:22px }
     .dialog-actions button { height:40px; padding:0 15px; border:1px solid var(--line); border-radius:10px; background:var(--panel); cursor:pointer; font-weight:750 }
     .dialog-actions .primary { border-color:var(--teal); background:var(--teal); color:#fff }
+    .conflict-dialog { width:min(440px,calc(100% - 32px)); padding:0; border:1px solid var(--line); border-radius:18px; background:var(--panel); color:var(--ink); box-shadow:var(--shadow) }
+    .conflict-form { padding:24px }
+    .conflict-form h2 { margin:0; font-size:22px; letter-spacing:-.04em }
+    .conflict-form p { margin:8px 0 20px; color:var(--muted); font-size:12px; line-height:1.55 }
+    .conflict-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px }
+    .conflict-actions button { min-height:40px; padding:8px 12px; border:1px solid var(--line); border-radius:10px; background:#fff; cursor:pointer; font-weight:750 }
+    .conflict-actions .danger { border-color:#b64b35; background:#b64b35; color:#fff }
     .toast { position:absolute; z-index:80; left:50%; bottom:26px; transform:translate(-50%,20px); padding:10px 14px; border-radius:10px; background:var(--ink); color:white; font-size:12px; opacity:0; pointer-events:none; transition:.2s }
     .toast.show { opacity:1; transform:translate(-50%,0) }
     .empty { position:absolute; inset:0; display:none; place-items:center; color:var(--muted); text-align:center; pointer-events:none }

@@ -1,22 +1,46 @@
-import type { BoardPersistenceAdapter, BoardState } from "./types";
+import type { BoardState, CloudDraft } from "./types";
 
-const keyFor = (boardId: string) => `openAxPeopleBoard:${boardId}`;
+const localBoardKey = (id: string) => `openAxPeopleBoard:local:${id}`;
+const cloudDraftKey = (id: string) => `openAxPeopleBoard:cloud-draft:${id}`;
+const cloudBackupKey = (id: string) => `openAxPeopleBoard:cloud-backup:${id}`;
 
-export class LocalStorageAdapter implements BoardPersistenceAdapter {
-  async load(boardId: string): Promise<BoardState | null> {
-    const serialized = localStorage.getItem(keyFor(boardId));
-    if (!serialized) return null;
-
-    try {
-      return JSON.parse(serialized) as BoardState;
-    } catch {
-      localStorage.removeItem(keyFor(boardId));
-      return null;
-    }
-  }
-
-  async save(boardId: string, state: BoardState): Promise<void> {
-    localStorage.setItem(keyFor(boardId), JSON.stringify(state));
+function readJson<T>(key: string): T | null {
+  const serialized = localStorage.getItem(key);
+  if (!serialized) return null;
+  try {
+    return JSON.parse(serialized) as T;
+  } catch {
+    localStorage.removeItem(key);
+    return null;
   }
 }
 
+export class LocalWorkspaceStore {
+  loadLocal(id: string): BoardState | null {
+    return readJson<BoardState>(localBoardKey(id));
+  }
+
+  saveLocal(id: string, state: BoardState): void {
+    localStorage.setItem(localBoardKey(id), JSON.stringify(state));
+  }
+
+  loadDraft(boardId: string): CloudDraft | null {
+    return readJson<CloudDraft>(cloudDraftKey(boardId));
+  }
+
+  saveDraft(boardId: string, draft: CloudDraft): void {
+    localStorage.setItem(cloudDraftKey(boardId), JSON.stringify(draft));
+  }
+
+  deleteDraft(boardId: string): void {
+    localStorage.removeItem(cloudDraftKey(boardId));
+  }
+
+  loadBackup(boardId: string): CloudDraft | null {
+    return readJson<CloudDraft>(cloudBackupKey(boardId));
+  }
+
+  saveBackup(boardId: string, draft: CloudDraft): void {
+    localStorage.setItem(cloudBackupKey(boardId), JSON.stringify(draft));
+  }
+}

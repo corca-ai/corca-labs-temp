@@ -1,9 +1,21 @@
 export type BoardState = Record<string, unknown>;
 
-export interface BoardPersistenceAdapter {
-  load(boardId: string): Promise<BoardState | null>;
-  save(boardId: string, state: BoardState): Promise<void>;
+export interface CloudBoard {
+  state: BoardState;
+  revision: number;
+  updatedAt: string;
 }
 
-export type PersistenceStatus = "local" | "syncing" | "synced" | "offline";
+export interface CloudDraft {
+  state: BoardState;
+  baseRevision: number | null;
+  savedAt: string;
+}
 
+export type WorkspaceMode = "cloud" | "cloud-draft" | "local";
+export type PersistenceStatus =
+  | "cloud"
+  | "draft"
+  | "local"
+  | "saving"
+  | "offline";
