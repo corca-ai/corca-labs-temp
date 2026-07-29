@@ -1,6 +1,15 @@
 <main class="app">
   <header>
-    <div class="brand"><small>Workshop constellation</small><h1>Open AX Day · People Canvas</h1></div>
+    <button class="document-toggle" id="documentToggle" type="button" aria-controls="documentSidebar" aria-expanded="false">
+      <span aria-hidden="true">▤</span> Document
+    </button>
+    <div class="brand">
+      <small id="documentKicker">Local workspace</small>
+      <div class="document-title-row">
+        <h1 id="documentTitle">Untitled board</h1>
+        <span class="sync-status" id="syncStatus" role="status" aria-live="polite">Local only</span>
+      </div>
+    </div>
     <div class="count" id="count">7 people</div>
     <label class="search"><span hidden>사람, 회사, 주제 검색</span><input id="search" type="search" placeholder="사람, 회사, 주제 검색…" autocomplete="off"><kbd>/</kbd></label>
     <div class="tools">
@@ -28,31 +37,51 @@
       <button class="icon-btn" id="undo" title="마지막 이동 또는 그룹 변경 실행 취소" aria-label="실행 취소">↶ <span class="label">Undo</span></button>
       <button class="icon-btn" id="reset" title="보드 초기화" aria-label="보드 초기화">↺ <span class="label">Reset</span></button>
     </div>
-    <details class="workspace" id="workspaceMenu">
-      <summary class="sync-status" id="syncStatus" role="status" aria-live="polite">Local only</summary>
-      <div class="workspace-popover">
-        <b id="workspaceTitle">Local workspace</b>
-        <p id="workspaceDescription">Changes stay in this browser.</p>
-        <label class="nickname-field">
-          <span>Board nickname</span>
-          <input id="boardNickname" type="text" maxlength="60" placeholder="Untitled board" autocomplete="off">
-        </label>
-        <div class="workspace-actions">
-          <button type="button" id="saveCloud" hidden>Save to cloud</button>
-          <button type="button" id="publishCloud" hidden>Publish to cloud</button>
-          <button type="button" id="openDraft" hidden>Open local draft</button>
-          <button type="button" id="viewCloud" hidden>View cloud state</button>
-          <button type="button" id="pullCloud" hidden>Load latest cloud</button>
-          <button type="button" id="restoreBackup" hidden>Restore local backup</button>
-          <button type="button" id="newLocal">New local workspace</button>
-        </div>
-        <section class="recent-workspaces" id="recentSection" hidden>
-          <b>Recent workspaces</b>
-          <div id="recentWorkspaces"></div>
-        </section>
-      </div>
-    </details>
   </header>
+  <div class="document-scrim" id="documentScrim"></div>
+  <aside class="document-sidebar" id="documentSidebar" aria-hidden="true" aria-label="Document and save states" inert>
+    <div class="document-sidebar-head">
+      <div><small>DOCUMENT</small><h2 id="workspaceTitle">Local workspace</h2></div>
+      <button type="button" id="closeDocument" aria-label="Close document sidebar">×</button>
+    </div>
+    <p class="document-explainer" id="workspaceDescription">Changes stay in this browser.</p>
+    <label class="nickname-field">
+      <span>Board nickname</span>
+      <input id="boardNickname" type="text" maxlength="60" placeholder="Untitled board" autocomplete="off">
+    </label>
+    <section class="document-layers" aria-label="Document versions">
+      <h3>Versions</h3>
+      <article class="document-layer local-layer" id="localLayer">
+        <span class="layer-icon local" aria-hidden="true">◆</span>
+        <div><b>Local workspace</b><small id="localLayerMeta">Autosaved in this browser</small></div>
+        <button type="button" id="publishCloud" hidden>Publish</button>
+      </article>
+      <article class="document-layer cloud-layer" id="cloudLayer" hidden>
+        <span class="layer-icon cloud" aria-hidden="true">☁</span>
+        <div><b>Cloud version</b><small id="cloudLayerMeta">Not saved yet</small></div>
+        <button type="button" id="viewCloud" hidden>View</button>
+      </article>
+      <article class="document-layer draft-layer" id="draftLayer" hidden>
+        <span class="layer-icon draft" aria-hidden="true">●</span>
+        <div><b>Local draft</b><small id="draftLayerMeta">Cloud is unchanged</small></div>
+        <button type="button" id="openDraft" hidden>Open</button>
+      </article>
+      <div class="layer-actions" id="draftLayerActions" hidden>
+        <button type="button" id="pullCloud">Discard draft</button>
+        <button class="primary" type="button" id="saveCloud">Save to cloud</button>
+      </div>
+      <article class="document-layer backup-layer" id="backupLayer" hidden>
+        <span class="layer-icon backup" aria-hidden="true">↶</span>
+        <div><b>Local backup</b><small id="backupLayerMeta">Last successfully saved draft</small></div>
+        <button type="button" id="restoreBackup">Restore</button>
+      </article>
+    </section>
+    <section class="recent-workspaces" id="recentSection" hidden>
+      <h3>Recent workspaces</h3>
+      <div id="recentWorkspaces"></div>
+    </section>
+    <button class="new-local-button" type="button" id="newLocal">＋ New local workspace</button>
+  </aside>
   <dialog class="random-dialog" id="randomDialog">
     <form class="random-form" id="randomForm">
       <h2>Random grouping</h2>
@@ -86,4 +115,9 @@
     <div class="drawer-scrim" id="scrim"></div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
   </section>
+  <div class="draft-save-bar" id="draftSaveBar" hidden role="region" aria-label="Unsaved cloud changes">
+    <div><b>Local draft</b><span>Your changes are safe in this browser. The cloud version is unchanged.</span></div>
+    <button type="button" id="discardDraftBar">Discard</button>
+    <button class="primary" type="button" id="saveCloudBar">Save to cloud</button>
+  </div>
 </main>

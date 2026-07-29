@@ -215,9 +215,14 @@ class WorkspaceController {
   }
 
   private bindUi(): void {
-    document.querySelector("#saveCloud")?.addEventListener("click", () => {
-      void this.saveDraftToCloud(false);
-    });
+    const saveDraft = () => void this.saveDraftToCloud(false);
+    const discardDraft = () => {
+      if (confirm("Discard this local draft and load the latest cloud state?")) {
+        void this.loadLatestCloud();
+      }
+    };
+    document.querySelector("#saveCloud")?.addEventListener("click", saveDraft);
+    document.querySelector("#saveCloudBar")?.addEventListener("click", saveDraft);
     document.querySelector("#publishCloud")?.addEventListener("click", () => {
       void this.publishLocal();
     });
@@ -229,11 +234,8 @@ class WorkspaceController {
       replaceWorkspaceUrl("cloud", this.id);
       location.reload();
     });
-    document.querySelector("#pullCloud")?.addEventListener("click", () => {
-      if (confirm("Discard this local draft and load the latest cloud state?")) {
-        void this.loadLatestCloud();
-      }
-    });
+    document.querySelector("#pullCloud")?.addEventListener("click", discardDraft);
+    document.querySelector("#discardDraftBar")?.addEventListener("click", discardDraft);
     document.querySelector("#restoreBackup")?.addEventListener("click", () => {
       this.restoreBackup();
     });
@@ -241,6 +243,46 @@ class WorkspaceController {
       replaceWorkspaceUrl("local", crypto.randomUUID());
       location.reload();
     });
+
+    const sidebar = document.querySelector<HTMLElement>("#documentSidebar");
+    const scrim = document.querySelector<HTMLElement>("#documentScrim");
+    const toggle = document.querySelector<HTMLButtonElement>("#documentToggle");
+    const setSidebarOpen = (open: boolean) => {
+      sidebar?.classList.toggle("open", open);
+      scrim?.classList.toggle("open", open);
+      sidebar?.setAttribute("aria-hidden", String(!open));
+      if (sidebar) sidebar.inert = !open;
+      toggle?.setAttribute("aria-expanded", String(open));
+      if (open) document.querySelector<HTMLInputElement>("#boardNickname")?.focus({ preventScroll: true });
+    };
+    toggle?.addEventListener("click", () => setSidebarOpen(!sidebar?.classList.contains("open")));
+    document.querySelector("#closeDocument")?.addEventListener("click", () => setSidebarOpen(false));
+    scrim?.addEventListener("click", () => setSidebarOpen(false));
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && sidebar?.classList.contains("open")) {
+        event.stopImmediatePropagation();
+        setSidebarOpen(false);
+        toggle?.focus({ preventScroll: true });
+        return;
+      }
+      if (event.key === "Tab" && sidebar?.classList.contains("open")) {
+        const focusable = Array.from(
+          sidebar.querySelectorAll<HTMLElement>(
+            'button:not([hidden]):not([disabled]), input:not([hidden]):not([disabled]), a[href]',
+          ),
+        ).filter((element) => element.offsetParent !== null);
+        const first = focusable[0];
+        const last = focusable.at(-1);
+        if (!first || !last) return;
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    }, { capture: true });
 
     const nickname = document.querySelector<HTMLInputElement>("#boardNickname");
     nickname?.addEventListener("input", () => {
@@ -377,7 +419,9 @@ class WorkspaceController {
     const status = document.querySelector<HTMLElement>("#syncStatus");
     const title = document.querySelector<HTMLElement>("#workspaceTitle");
     const description = document.querySelector<HTMLElement>("#workspaceDescription");
-    if (!status || !title || !description) return;
+    const documentTitle = document.querySelector<HTMLElement>("#documentTitle");
+    const documentKicker = document.querySelector<HTMLElement>("#documentKicker");
+    if (!status || !title || !description || !documentTitle || !documentKicker) return;
 
     const labels: Record<PersistenceStatus, string> = {
       cloud: "Cloud",
@@ -391,6 +435,15 @@ class WorkspaceController {
 
     const isLocal = this.mode === "local";
     const isDraft = this.mode === "cloud-draft";
+    const storedDraft = this.local.loadDraft(this.id);
+    const backup = this.local.loadBackup(this.id);
+    const boardNickname = nicknameOf(this.currentState);
+    documentTitle.textContent = boardNickname || "Untitled board";
+    documentKicker.textContent = isLocal
+      ? "Local workspace"
+      : isDraft
+        ? "Cloud board · editing local draft"
+        : "Cloud board";
     title.textContent = isLocal
       ? "Local workspace"
       : isDraft
@@ -404,16 +457,64 @@ class WorkspaceController {
 
     const nickname = document.querySelector<HTMLInputElement>("#boardNickname");
     if (nickname && document.activeElement !== nickname) {
-      nickname.value = nicknameOf(this.currentState);
+      nickname.value = boardNickname;
     }
 
+    const localLayer = document.querySelector<HTMLElement>("#localLayer");
+    const cloudLayer = document.querySelector<HTMLElement>("#cloudLayer");
+    const draftLayer = document.querySelector<HTMLElement>("#draftLayer");
+    const backupLayer = document.querySelector<HTMLElement>("#backupLayer");
+    localLayer?.classList.toggle("current", isLocal);
+    cloudLayer?.classList.toggle("current", !isLocal && !isDraft);
+    draftLayer?.classList.toggle("current", isDraft);
+
+    this.setVisible("#localLayer", isLocal);
+    this.setVisible("#cloudLayer", !isLocal);
+    this.setVisible("#draftLayer", !isLocal && Boolean(storedDraft));
+    this.setVisible("#draftLayerActions", isDraft && Boolean(this.remote));
+    this.setVisible("#backupLayer", !isLocal && Boolean(backup));
+    this.setVisible("#draftSaveBar", isDraft && Boolean(this.remote));
     this.setVisible("#saveCloud", isDraft && Boolean(this.remote));
     this.setVisible("#publishCloud", isLocal && Boolean(this.remote));
-    this.setVisible("#openDraft", !isLocal && !isDraft && Boolean(this.local.loadDraft(this.id)));
+    this.setVisible("#openDraft", !isLocal && !isDraft && Boolean(storedDraft));
     this.setVisible("#viewCloud", isDraft);
     this.setVisible("#pullCloud", isDraft && Boolean(this.remote));
-    this.setVisible("#restoreBackup", !isLocal && Boolean(this.local.loadBackup(this.id)));
+    this.setVisible("#restoreBackup", !isLocal && Boolean(backup));
+
+    const cloudMeta = document.querySelector<HTMLElement>("#cloudLayerMeta");
+    const draftMeta = document.querySelector<HTMLElement>("#draftLayerMeta");
+    const backupMeta = document.querySelector<HTMLElement>("#backupLayerMeta");
+    const localMeta = document.querySelector<HTMLElement>("#localLayerMeta");
+    if (localMeta) localMeta.textContent = "Autosaved in this browser";
+    if (cloudMeta) {
+      cloudMeta.textContent = this.cloudBoard
+        ? `Revision ${this.cloudBoard.revision} · ${this.formatTimestamp(this.cloudBoard.updatedAt)}`
+        : "Not published yet";
+    }
+    if (draftMeta && storedDraft) {
+      draftMeta.textContent = `Autosaved ${this.formatTimestamp(storedDraft.savedAt)} · cloud unchanged`;
+    }
+    if (backupMeta && backup) {
+      backupMeta.textContent = `Saved ${this.formatTimestamp(backup.savedAt)}`;
+    }
+
+    const saving = this.status === "saving";
+    for (const selector of ["#saveCloud", "#saveCloudBar", "#publishCloud"]) {
+      const button = document.querySelector<HTMLButtonElement>(selector);
+      if (button) button.disabled = saving;
+    }
     this.renderRecents();
+  }
+
+  private formatTimestamp(value: string): string {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "time unknown";
+    return date.toLocaleString([], {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   }
 
   private renderRecents(): void {
