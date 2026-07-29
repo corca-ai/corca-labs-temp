@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    >
+    <meta
+      name="description"
+      content="Preview a local Open AX Day Mermaid workflow and print it as a PDF."
+    >
+    <title>Workflow viewer</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="./src/styles.css">
+  </head>
+  <body>
+    <header class="toolbar">
+      <div class="identity">
+        <span class="eyebrow">Open AX Day</span>
+        <h1 id="document-title">Workflow viewer</h1>
+      </div>
+
+      <div class="actions">
+        <button id="open-button" class="button button-primary" type="button" disabled>
+          Open workflow
+        </button>
+        <button id="refresh-button" class="button" type="button" hidden>
+          Refresh
+        </button>
+        <button id="print-button" class="button" type="button" disabled>
+          Print / Save PDF
+        </button>
+      </div>
+
+      <input
+        id="file-input"
+        class="visually-hidden"
+        type="file"
+        accept=".md,text/markdown,text/plain"
+        aria-label="Choose a workflow Markdown file"
+      >
+    </header>
+
+    <main id="drop-zone" class="workspace">
+      <section id="welcome-panel" class="welcome-panel" aria-labelledby="welcome-title">
+        <div class="file-mark" aria-hidden="true">.md</div>
+        <div>
+          <h2 id="welcome-title">Open your workflow</h2>
+          <p>
+            Choose <strong>Open workflow</strong>, or drag a Mermaid workflow
+            Markdown file here.
+          </p>
+          <p class="privacy-note">
+            Your workflow file stays in this browser and is not uploaded.
+          </p>
+        </div>
+      </section>
+
+      <section id="viewer-panel" class="viewer-panel" hidden aria-label="Rendered workflow">
+        <div class="file-status">
+          <div class="file-details">
+            <span id="filename" class="filename"></span>
+            <span id="status" class="status" role="status" aria-live="polite"></span>
+          </div>
+          <span class="local-badge">Local only</span>
+        </div>
+        <div id="diagram" class="diagram" aria-label="Workflow diagram"></div>
+      </section>
+
+      <section id="error-panel" class="error-panel" hidden role="alert">
+        <span class="error-label">Couldn’t show this workflow</span>
+        <h2 id="error-title">Check the file and try again</h2>
+        <pre id="error-detail"></pre>
+        <p id="error-guidance"></p>
+      </section>
+    </main>
+
+    <style id="print-page-style">
+      @page { size: A4 landscape; margin: 10mm; }
+    </style>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

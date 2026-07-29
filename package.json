@@ -11,6 +11,7 @@
     "check": "npm run check --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "dev:board": "npm run dev --workspace @corca-labs/open-ax-day-board",
+    "dev:workflow-viewer": "npm run dev --workspace @corca-labs/workflow-viewer",
     "dev:api": "npm run dev --workspace @corca-labs/board-api",
     "deploy:api": "npm run deploy --workspace @corca-labs/board-api"
   },

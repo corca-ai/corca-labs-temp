@@ -5,6 +5,7 @@ Multi-app GitHub Pages repository for temporary Corca Labs tools.
 ## Apps
 
 - `open-ax-day-board` → `/open-ax-day-board/`
+- `workflow-viewer` → `/workflow-viewer/`
 
 Each app builds independently under `apps/`. `apps.json` is the deploy manifest;
 `npm run build` assembles every app into `site/` and generates the repository

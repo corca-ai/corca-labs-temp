@@ -5,6 +5,12 @@
     "source": "apps/open-ax-day-board/dist",
     "title": "Open AX Day · People Canvas",
     "description": "A collaborative canvas for grouping workshop participants and accumulating internal notes."
+  },
+  {
+    "slug": "workflow-viewer",
+    "workspace": "@corca-labs/workflow-viewer",
+    "source": "apps/workflow-viewer/dist",
+    "title": "Open AX Day · Workflow Viewer",
+    "description": "Preview a local Mermaid workflow and save the confirmed diagram as PDF."
   }
 ]
-
