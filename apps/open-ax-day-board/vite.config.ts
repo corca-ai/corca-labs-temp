@@ -1,6 +1,6 @@
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  base: "/open-ax-day-board/",
+  // Keep each app relocatable under a repository-scoped GitHub Pages URL.
+  base: "./",
 });
-
