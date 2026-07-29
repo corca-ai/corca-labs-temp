@@ -29,6 +29,10 @@ const POLL_INTERVAL_MS = 1_500;
 const EDIT_DELAY_MS = 220;
 const HASH_DELAY_MS = 320;
 const VIEW_MODE_STORAGE_KEY = "workflow-viewer:view-mode";
+const MIN_DIAGRAM_SCALE = 0.1;
+const MAX_DIAGRAM_SCALE = 4;
+const DIAGRAM_ZOOM_STEP = 1.2;
+const DIAGRAM_FIT_PADDING = 48;
 const DEFAULT_CODE = `# 문의 처리 흐름
 
 \`\`\`mermaid
@@ -104,6 +108,11 @@ const COPY = {
     notMarkdownGuidance: ".md 파일을 선택하세요.",
     rendererError: "Mermaid 렌더러를 불러올 수 없습니다.",
     rendererGuidance: "인터넷 연결을 확인한 다음 페이지를 새로고침하세요. 로컬 파일에는 접근하지 않았습니다.",
+    diagramViewport: "확대/축소 및 이동이 가능한 Mermaid 다이어그램",
+    diagramZoomIn: "확대",
+    diagramZoomOut: "축소",
+    diagramFit: "화면에 맞춤",
+    diagramHelp: "휠로 확대/축소 · 드래그로 이동",
   },
   en: {
     title: "Workflow viewer",
@@ -155,6 +164,11 @@ const COPY = {
     notMarkdownGuidance: "Choose a .md file.",
     rendererError: "Could not load the Mermaid renderer.",
     rendererGuidance: "Check your internet connection and reload this page. Your local file was not accessed.",
+    diagramViewport: "Zoomable and pannable Mermaid diagram",
+    diagramZoomIn: "Zoom in",
+    diagramZoomOut: "Zoom out",
+    diagramFit: "Fit to view",
+    diagramHelp: "Scroll to zoom · drag to pan",
   },
 };
 
@@ -267,6 +281,31 @@ let copyResetTimer;
 let copyPngResetTimer;
 /** @type {number | undefined} */
 let pngResetTimer;
+/**
+ * @typedef {{
+ *   viewport: HTMLElement,
+ *   canvas: HTMLElement,
+ *   zoomLevel: HTMLElement,
+ *   naturalWidth: number,
+ *   naturalHeight: number,
+ *   scale: number,
+ *   x: number,
+ *   y: number,
+ *   fitted: boolean,
+ *   pointerId?: number,
+ *   pointerStartX: number,
+ *   pointerStartY: number,
+ *   originX: number,
+ *   originY: number,
+ *   moved: boolean,
+ *   suppressClick: boolean,
+ *   resizeObserver: ResizeObserver,
+ * }} DiagramViewportState
+ */
+/** @type {WeakMap<Element, DiagramViewportState>} */
+const diagramViewportStates = new WeakMap();
+/** @type {WeakMap<Element, number>} */
+const diagramExportDepth = new WeakMap();
 
 const codeEditor = monaco.editor.create(editorHost, {
   value: "",
@@ -299,7 +338,13 @@ function updateViewModeUi() {
       String(option.dataset.viewMode === activeViewMode),
     );
   }
-  window.requestAnimationFrame(() => codeEditor.layout());
+  window.requestAnimationFrame(() => {
+    codeEditor.layout();
+    for (const diagram of preview.querySelectorAll(".mermaid-diagram")) {
+      const state = diagramViewportStates.get(diagram);
+      if (state?.fitted) fitDiagramToViewport(state);
+    }
+  });
 }
 
 /** @param {ViewMode} mode */
@@ -413,6 +458,7 @@ function applyTranslations() {
   }
   documentTitle.textContent = currentStem === "workflow" ? copy.title : currentStem;
   document.title = currentStem === "workflow" ? copy.title : currentStem;
+  updateDiagramControlCopy();
   updateStatus();
   renderErrorCopy();
 }
@@ -609,6 +655,294 @@ function prepareInteractiveDiagram(container) {
   container.classList.add("is-interactive");
 }
 
+/** @param {number} value */
+function clampDiagramScale(value) {
+  return Math.min(MAX_DIAGRAM_SCALE, Math.max(MIN_DIAGRAM_SCALE, value));
+}
+
+/** @param {DiagramViewportState} state */
+function renderDiagramTransform(state) {
+  state.canvas.style.transform =
+    `translate(${state.x}px, ${state.y}px) scale(${state.scale})`;
+  state.zoomLevel.textContent = `${Math.round(state.scale * 100)}%`;
+}
+
+/** @param {DiagramViewportState} state */
+function fitDiagramToViewport(state) {
+  const width = state.viewport.clientWidth;
+  const height = state.viewport.clientHeight;
+  if (!width || !height) return;
+  state.scale = clampDiagramScale(
+    Math.min(
+      (width - DIAGRAM_FIT_PADDING) / state.naturalWidth,
+      (height - DIAGRAM_FIT_PADDING) / state.naturalHeight,
+    ),
+  );
+  state.x = (width - state.naturalWidth * state.scale) / 2;
+  state.y = (height - state.naturalHeight * state.scale) / 2;
+  state.fitted = true;
+  renderDiagramTransform(state);
+}
+
+/**
+ * @param {DiagramViewportState} state
+ * @param {number} nextScale
+ * @param {number} pointX
+ * @param {number} pointY
+ */
+function zoomDiagramAtPoint(state, nextScale, pointX, pointY) {
+  const scale = clampDiagramScale(nextScale);
+  if (scale === state.scale) return;
+  const diagramX = (pointX - state.x) / state.scale;
+  const diagramY = (pointY - state.y) / state.scale;
+  state.x = pointX - diagramX * scale;
+  state.y = pointY - diagramY * scale;
+  state.scale = scale;
+  state.fitted = false;
+  renderDiagramTransform(state);
+}
+
+/**
+ * @param {DiagramViewportState} state
+ * @param {number} multiplier
+ */
+function zoomDiagramFromCenter(state, multiplier) {
+  zoomDiagramAtPoint(
+    state,
+    state.scale * multiplier,
+    state.viewport.clientWidth / 2,
+    state.viewport.clientHeight / 2,
+  );
+}
+
+/** @param {Element} [diagram] */
+function updateDiagramControlCopy(diagram) {
+  const copy = COPY[activeLanguage];
+  const diagrams = diagram
+    ? [diagram]
+    : Array.from(preview.querySelectorAll(".mermaid-diagram"));
+  for (const item of diagrams) {
+    const viewport = item.querySelector(".mermaid-viewport");
+    const zoomOut = item.querySelector("[data-diagram-action='zoom-out']");
+    const zoomIn = item.querySelector("[data-diagram-action='zoom-in']");
+    const fit = item.querySelector("[data-diagram-action='fit']");
+    const help = item.querySelector(".diagram-help");
+    viewport?.setAttribute("aria-label", copy.diagramViewport);
+    zoomOut?.setAttribute("aria-label", copy.diagramZoomOut);
+    zoomOut?.setAttribute("title", copy.diagramZoomOut);
+    zoomIn?.setAttribute("aria-label", copy.diagramZoomIn);
+    zoomIn?.setAttribute("title", copy.diagramZoomIn);
+    fit?.setAttribute("aria-label", copy.diagramFit);
+    fit?.setAttribute("title", copy.diagramFit);
+    if (fit) fit.textContent = copy.diagramFit;
+    if (help) help.textContent = copy.diagramHelp;
+  }
+}
+
+/** @param {Element} container */
+function prepareDiagramViewport(container) {
+  const svg = container.querySelector("svg");
+  if (!(svg instanceof SVGSVGElement)) return;
+  const viewBox = svg.viewBox.baseVal;
+  const naturalWidth =
+    viewBox.width || Number.parseFloat(svg.getAttribute("width") ?? "") || 800;
+  const naturalHeight =
+    viewBox.height || Number.parseFloat(svg.getAttribute("height") ?? "") || 450;
+
+  const viewport = document.createElement("div");
+  viewport.className = "mermaid-viewport";
+  viewport.tabIndex = 0;
+
+  const canvas = document.createElement("div");
+  canvas.className = "mermaid-canvas";
+  canvas.style.width = `${naturalWidth}px`;
+  canvas.style.height = `${naturalHeight}px`;
+  svg.replaceWith(viewport);
+  canvas.append(svg);
+  viewport.append(canvas);
+
+  const controls = document.createElement("div");
+  controls.className = "diagram-controls";
+  controls.dataset.diagramChrome = "";
+  const zoomOut = document.createElement("button");
+  zoomOut.type = "button";
+  zoomOut.dataset.diagramAction = "zoom-out";
+  zoomOut.textContent = "−";
+  const zoomLevel = document.createElement("span");
+  zoomLevel.className = "diagram-zoom-level";
+  zoomLevel.textContent = "100%";
+  const zoomIn = document.createElement("button");
+  zoomIn.type = "button";
+  zoomIn.dataset.diagramAction = "zoom-in";
+  zoomIn.textContent = "+";
+  const fit = document.createElement("button");
+  fit.type = "button";
+  fit.className = "diagram-fit-button";
+  fit.dataset.diagramAction = "fit";
+  controls.append(zoomOut, zoomLevel, zoomIn, fit);
+  viewport.append(controls);
+
+  const help = document.createElement("span");
+  help.className = "diagram-help";
+  help.dataset.diagramChrome = "";
+  viewport.append(help);
+
+  /** @type {DiagramViewportState} */
+  const state = {
+    viewport,
+    canvas,
+    zoomLevel,
+    naturalWidth,
+    naturalHeight,
+    scale: 1,
+    x: 0,
+    y: 0,
+    fitted: true,
+    pointerStartX: 0,
+    pointerStartY: 0,
+    originX: 0,
+    originY: 0,
+    moved: false,
+    suppressClick: false,
+    resizeObserver: new ResizeObserver(() => {
+      if (state.fitted) fitDiagramToViewport(state);
+    }),
+  };
+  diagramViewportStates.set(container, state);
+  updateDiagramControlCopy(container);
+
+  controls.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const button =
+      event.target instanceof Element
+        ? event.target.closest("[data-diagram-action]")
+        : null;
+    if (!(button instanceof HTMLButtonElement)) return;
+    if (button.dataset.diagramAction === "zoom-in") {
+      zoomDiagramFromCenter(state, DIAGRAM_ZOOM_STEP);
+    } else if (button.dataset.diagramAction === "zoom-out") {
+      zoomDiagramFromCenter(state, 1 / DIAGRAM_ZOOM_STEP);
+    } else {
+      fitDiagramToViewport(state);
+    }
+  });
+
+  viewport.addEventListener(
+    "wheel",
+    (event) => {
+      if (
+        event.target instanceof Element &&
+        event.target.closest(".diagram-controls")
+      ) {
+        return;
+      }
+      const bounds = viewport.getBoundingClientRect();
+      const delta = Math.max(-100, Math.min(100, event.deltaY));
+      const nextScale = clampDiagramScale(
+        state.scale * Math.exp(-delta * 0.002),
+      );
+      if (nextScale === state.scale) return;
+      event.preventDefault();
+      zoomDiagramAtPoint(
+        state,
+        nextScale,
+        event.clientX - bounds.left,
+        event.clientY - bounds.top,
+      );
+    },
+    { passive: false },
+  );
+
+  viewport.addEventListener("pointerdown", (event) => {
+    if (
+      event.button !== 0 ||
+      (event.target instanceof Element &&
+        event.target.closest(".diagram-controls"))
+    ) {
+      return;
+    }
+    state.pointerId = event.pointerId;
+    state.pointerStartX = event.clientX;
+    state.pointerStartY = event.clientY;
+    state.originX = state.x;
+    state.originY = state.y;
+    state.moved = false;
+    viewport.setPointerCapture(event.pointerId);
+    viewport.classList.add("is-panning");
+  });
+
+  viewport.addEventListener("pointermove", (event) => {
+    if (event.pointerId !== state.pointerId) return;
+    const deltaX = event.clientX - state.pointerStartX;
+    const deltaY = event.clientY - state.pointerStartY;
+    if (Math.abs(deltaX) + Math.abs(deltaY) > 3) state.moved = true;
+    state.x = state.originX + deltaX;
+    state.y = state.originY + deltaY;
+    state.fitted = false;
+    renderDiagramTransform(state);
+  });
+
+  const finishPan = (/** @type {PointerEvent} */ event) => {
+    if (event.pointerId !== state.pointerId) return;
+    if (viewport.hasPointerCapture(event.pointerId)) {
+      viewport.releasePointerCapture(event.pointerId);
+    }
+    state.pointerId = undefined;
+    viewport.classList.remove("is-panning");
+    if (state.moved) {
+      state.suppressClick = true;
+      window.setTimeout(() => {
+        state.suppressClick = false;
+      }, 0);
+    }
+  };
+  viewport.addEventListener("pointerup", finishPan);
+  viewport.addEventListener("pointercancel", finishPan);
+  viewport.addEventListener(
+    "click",
+    (event) => {
+      if (!state.suppressClick) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    },
+    true,
+  );
+  viewport.addEventListener("dblclick", (event) => {
+    if (
+      event.target instanceof Element &&
+      event.target.closest(".diagram-controls")
+    ) {
+      return;
+    }
+    event.preventDefault();
+    fitDiagramToViewport(state);
+  });
+  viewport.addEventListener("keydown", (event) => {
+    if (event.target !== viewport) return;
+    if (event.key === "+" || event.key === "=") {
+      event.preventDefault();
+      zoomDiagramFromCenter(state, DIAGRAM_ZOOM_STEP);
+    } else if (event.key === "-") {
+      event.preventDefault();
+      zoomDiagramFromCenter(state, 1 / DIAGRAM_ZOOM_STEP);
+    } else if (event.key === "0") {
+      event.preventDefault();
+      fitDiagramToViewport(state);
+    } else if (event.key.startsWith("Arrow")) {
+      event.preventDefault();
+      state.fitted = false;
+      if (event.key === "ArrowLeft") state.x -= 32;
+      if (event.key === "ArrowRight") state.x += 32;
+      if (event.key === "ArrowUp") state.y -= 32;
+      if (event.key === "ArrowDown") state.y += 32;
+      renderDiagramTransform(state);
+    }
+  });
+
+  state.resizeObserver.observe(viewport);
+  fitDiagramToViewport(state);
+}
+
 function clearDiagramHighlight() {
   for (const diagram of preview.querySelectorAll(
     ".mermaid-diagram.is-highlighted",
@@ -772,6 +1106,34 @@ async function waitForDiagramVisualState() {
   await new Promise((resolve) => window.setTimeout(resolve, 160));
 }
 
+function prepareDiagramsForExport() {
+  const diagrams = Array.from(
+    preview.querySelectorAll(".mermaid-diagram"),
+  );
+  for (const diagram of diagrams) {
+    const depth = diagramExportDepth.get(diagram) ?? 0;
+    diagramExportDepth.set(diagram, depth + 1);
+    diagram.classList.add("is-exporting");
+  }
+  return () => {
+    for (const diagram of diagrams) {
+      const depth = (diagramExportDepth.get(diagram) ?? 1) - 1;
+      if (depth > 0) {
+        diagramExportDepth.set(diagram, depth);
+      } else {
+        diagramExportDepth.delete(diagram);
+        diagram.classList.remove("is-exporting");
+      }
+    }
+  };
+}
+
+function disposeDiagramViewports() {
+  for (const diagram of preview.querySelectorAll(".mermaid-diagram")) {
+    diagramViewportStates.get(diagram)?.resizeObserver.disconnect();
+  }
+}
+
 function pinDiagramHighlightForExport() {
   const elements = Array.from(
     preview.querySelectorAll(
@@ -812,12 +1174,13 @@ function pinDiagramHighlightForExport() {
 async function renderDocumentPng() {
   await document.fonts.ready;
   await waitForDiagramVisualState();
-  const bounds = preview.getBoundingClientRect();
-  const width = Math.ceil(Math.max(bounds.width, preview.scrollWidth));
-  const height = Math.ceil(Math.max(bounds.height, preview.scrollHeight));
+  const restoreDiagramPresentation = prepareDiagramsForExport();
   const restoreHighlight = pinDiagramHighlightForExport();
   let blob;
   try {
+    const bounds = preview.getBoundingClientRect();
+    const width = Math.ceil(Math.max(bounds.width, preview.scrollWidth));
+    const height = Math.ceil(Math.max(bounds.height, preview.scrollHeight));
     blob = await toBlob(preview, {
       backgroundColor: "#ffffff",
       cacheBust: true,
@@ -835,6 +1198,7 @@ async function renderDocumentPng() {
     });
   } finally {
     restoreHighlight();
+    restoreDiagramPresentation();
   }
   if (!blob) throw new Error("Could not render the document as PNG.");
   return cropPngToContent(blob, 32);
@@ -844,6 +1208,7 @@ async function renderDocumentPng() {
 async function createClipboardHtml() {
   await document.fonts.ready;
   await waitForDiagramVisualState();
+  const restoreDiagramPresentation = prepareDiagramsForExport();
   const restoreHighlight = pinDiagramHighlightForExport();
   let clone;
   let diagramImages;
@@ -869,6 +1234,7 @@ async function createClipboardHtml() {
     );
   } finally {
     restoreHighlight();
+    restoreDiagramPresentation();
   }
   const cloneDiagrams = Array.from(
     clone.querySelectorAll(".mermaid-diagram"),
@@ -891,8 +1257,12 @@ async function createClipboardHtml() {
 }
 
 function copyPreviewSelection() {
+  const restoreDiagramPresentation = prepareDiagramsForExport();
   const selection = window.getSelection();
-  if (!selection) throw new Error("Clipboard selection is unavailable.");
+  if (!selection) {
+    restoreDiagramPresentation();
+    throw new Error("Clipboard selection is unavailable.");
+  }
   const previousRanges = Array.from(
     { length: selection.rangeCount },
     (_, index) => selection.getRangeAt(index).cloneRange(),
@@ -901,14 +1271,21 @@ function copyPreviewSelection() {
   range.selectNodeContents(preview);
   selection.removeAllRanges();
   selection.addRange(range);
-  const copied = document.execCommand("copy");
-  selection.removeAllRanges();
-  for (const previousRange of previousRanges) selection.addRange(previousRange);
+  let copied;
+  try {
+    copied = document.execCommand("copy");
+  } finally {
+    selection.removeAllRanges();
+    for (const previousRange of previousRanges) selection.addRange(previousRange);
+    restoreDiagramPresentation();
+  }
   if (!copied) throw new Error("Clipboard copy was rejected.");
 }
 
 async function copyRenderedDocument() {
+  const restoreDiagramPresentation = prepareDiagramsForExport();
   const plainText = preview.innerText;
+  restoreDiagramPresentation();
   if (navigator.clipboard?.write && "ClipboardItem" in window) {
     const pngPromise = renderDocumentPng();
     const htmlPromise = createClipboardHtml();
@@ -1000,6 +1377,7 @@ async function renderMarkdown(markdown, successMode, successTime) {
   try {
     const rawHtml = await marked.parse(markdown);
     if (requestId !== activeRender) return;
+    disposeDiagramViewports();
     preview.innerHTML = DOMPurify.sanitize(rawHtml);
     for (const link of preview.querySelectorAll("a")) {
       link.setAttribute("rel", "noopener noreferrer");
@@ -1026,6 +1404,7 @@ async function renderMarkdown(markdown, successMode, successTime) {
         rendered.bindFunctions?.(container);
         prepareInteractiveDiagram(container);
         pre.replaceWith(container);
+        prepareDiagramViewport(container);
       } catch (problem) {
         blockErrors.push(problem);
         pre.classList.add("mermaid-block-error");

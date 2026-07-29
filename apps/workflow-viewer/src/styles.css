@@ -342,22 +342,136 @@
   }
 
   .mermaid-diagram {
-    display: grid;
     width: 100%;
-    min-height: 220px;
     margin: 1.5em 0;
-    padding: 12px 0;
-    place-items: center;
-    overflow: auto;
+    overflow: hidden;
+    background:
+      linear-gradient(#eef1ee 1px, transparent 1px),
+      linear-gradient(90deg, #eef1ee 1px, transparent 1px),
+      #fbfcfb;
+    background-size: 24px 24px;
+    border: 1px solid #d8ddd9;
+    border-radius: 12px;
   }
 
-  .mermaid-diagram svg {
+  .mermaid-viewport {
+    position: relative;
+    height: clamp(320px, 56vh, 680px);
+    overflow: hidden;
+    cursor: grab;
+    outline: none;
+    touch-action: none;
+    user-select: none;
+  }
+
+  .mermaid-viewport.is-panning {
+    cursor: grabbing;
+  }
+
+  .mermaid-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-origin: 0 0;
+    will-change: transform;
+  }
+
+  .mermaid-canvas svg {
     display: block;
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    max-height: none;
+  }
+
+  .diagram-controls {
+    position: absolute;
+    z-index: 3;
+    top: 10px;
+    right: 10px;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    background: rgb(255 255 255 / 94%);
+    border: 1px solid #cbd2cd;
+    border-radius: 9px;
+    box-shadow: 0 3px 12px rgb(23 35 31 / 10%);
+    cursor: default;
+  }
+
+  .diagram-controls button {
+    min-width: 34px;
+    height: 34px;
+    padding: 0 9px;
+    color: var(--color-text);
+    background: transparent;
+    border: 0;
+    border-right: 1px solid #e0e4e1;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 800;
+  }
+
+  .diagram-controls .diagram-fit-button {
+    border-right: 0;
+    font-size: 11px;
+  }
+
+  .diagram-zoom-level {
+    min-width: 48px;
+    color: var(--color-muted);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 800;
+    text-align: center;
+  }
+
+  .diagram-help {
+    position: absolute;
+    z-index: 2;
+    bottom: 10px;
+    left: 10px;
+    padding: 5px 8px;
+    color: #65716b;
+    background: rgb(255 255 255 / 88%);
+    border: 1px solid #dfe4e0;
+    border-radius: 7px;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1.2;
+    pointer-events: none;
+  }
+
+  .mermaid-diagram.is-exporting {
+    overflow: visible;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .mermaid-diagram.is-exporting .mermaid-viewport {
+    height: auto;
+    overflow: visible;
+  }
+
+  .mermaid-diagram.is-exporting .mermaid-canvas {
+    position: static;
+    display: grid;
+    width: 100% !important;
+    height: auto !important;
+    transform: none !important;
+    place-items: center;
+  }
+
+  .mermaid-diagram.is-exporting .mermaid-canvas svg {
     width: auto;
     max-width: 100%;
     height: auto;
     max-height: calc(100vh - 180px);
-    margin: auto;
+  }
+
+  .mermaid-diagram.is-exporting [data-diagram-chrome] {
+    display: none;
   }
 
   .mermaid-diagram.is-interactive .node.proc {
@@ -457,7 +571,8 @@
   .button:focus-visible,
   .view-option:focus-visible,
   .language-option:focus-visible,
-  .editor-host:focus-within {
+  .editor-host:focus-within,
+  .mermaid-viewport:focus-visible {
     outline: 3px solid rgb(15 126 110 / 24%);
     outline-offset: 2px;
   }
@@ -469,6 +584,17 @@
   .button:disabled {
     cursor: not-allowed;
     opacity: 0.45;
+  }
+
+  .diagram-controls button:hover {
+    background: #f1f5f2;
+  }
+
+  .diagram-controls button:focus-visible {
+    position: relative;
+    z-index: 1;
+    outline: 3px solid rgb(15 126 110 / 24%);
+    outline-offset: -3px;
   }
 
   .mermaid-diagram .node,
@@ -637,11 +763,36 @@
       break-inside: avoid;
     }
 
-    .mermaid-diagram svg {
+    .mermaid-diagram {
+      overflow: visible;
+      background: transparent;
+      border: 0;
+      border-radius: 0;
+    }
+
+    .mermaid-viewport {
+      height: auto;
+      overflow: visible;
+    }
+
+    .mermaid-canvas {
+      position: static;
+      display: grid;
+      width: 100% !important;
+      height: auto !important;
+      transform: none !important;
+      place-items: center;
+    }
+
+    .mermaid-canvas svg {
       width: 100% !important;
       height: auto !important;
       max-width: 100%;
       max-height: 235mm;
+    }
+
+    [data-diagram-chrome] {
+      display: none !important;
     }
 
     .mermaid-diagram .node,
