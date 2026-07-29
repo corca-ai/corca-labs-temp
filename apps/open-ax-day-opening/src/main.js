@@ -14,6 +14,23 @@ const revealPosition = /** @type {HTMLElement} */ (requiredElement("#reveal-posi
 let currentIndex = 0;
 let revealedCount = 0;
 
+const responseOrders = [
+  [5, 1, 8, 3, 0, 7, 2, 6, 4],
+  [2, 7, 0, 5, 3, 8, 1, 4, 6],
+  [8, 3, 6, 1, 4, 0, 7, 2, 5],
+  [4, 0, 7, 2, 8, 5, 1, 6, 3],
+];
+
+document.querySelectorAll(".responses").forEach((list, questionIndex) => {
+  const items = [...list.children];
+  const order = responseOrders[questionIndex];
+  if (!order) return;
+  order.forEach((itemIndex) => {
+    const item = items[itemIndex];
+    if (item) list.append(item);
+  });
+});
+
 function currentSlide() {
   const slide = slides[currentIndex];
   if (!slide) throw new Error("Missing current slide");
