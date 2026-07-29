@@ -3,16 +3,43 @@ import assert from "node:assert/strict";
 import { deflate } from "pako";
 
 import {
+  decodeViewMode,
   decodeUrlState,
   encodePakoState,
   MAX_COMPRESSED_BYTES,
   MAX_DECOMPRESSED_BYTES,
+  urlWithViewMode,
   UrlStateSizeWarning,
 } from "../src/url-state.js";
 
 function base64Url(bytes) {
   return Buffer.from(bytes).toString("base64url");
 }
+
+test("reads split and preview view modes from URL parameters", () => {
+  assert.equal(decodeViewMode("?view=split"), "split");
+  assert.equal(decodeViewMode("?view=preview"), "viewer");
+  assert.equal(decodeViewMode("?view=viewer"), undefined);
+  assert.equal(decodeViewMode("?view=unknown"), undefined);
+  assert.equal(decodeViewMode(""), undefined);
+});
+
+test("writes view mode without changing other URL state", () => {
+  assert.equal(
+    urlWithViewMode(
+      "https://example.com/workflow-viewer/?lang=en#pako:payload",
+      "viewer",
+    ).href,
+    "https://example.com/workflow-viewer/?lang=en&view=preview#pako:payload",
+  );
+  assert.equal(
+    urlWithViewMode(
+      "https://example.com/workflow-viewer/?view=preview#pako:payload",
+      "split",
+    ).href,
+    "https://example.com/workflow-viewer/?view=split#pako:payload",
+  );
+});
 
 test("round-trips Korean Mermaid code and filename through pako URL state", () => {
   const code = 'flowchart TD\n  A["입력"] --> B["처리"]';

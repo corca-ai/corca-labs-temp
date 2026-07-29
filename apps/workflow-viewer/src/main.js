@@ -4,8 +4,10 @@ import {
   isMarkdownFilename,
 } from "./workflow.js";
 import {
+  decodeViewMode,
   decodeUrlState,
   encodePakoState,
+  urlWithViewMode,
   UrlStateSizeWarning,
 } from "./url-state.js";
 import DOMPurify from "dompurify";
@@ -259,8 +261,11 @@ let currentStem = "workflow";
 let currentFilename = "";
 /** @type {string | undefined} */
 let programmaticEditorValue;
-/** @type {ViewMode} */
-let activeViewMode = (() => {
+
+/** @returns {ViewMode} */
+function resolveViewMode() {
+  const urlViewMode = decodeViewMode(location.search);
+  if (urlViewMode) return urlViewMode;
   try {
     return localStorage.getItem(VIEW_MODE_STORAGE_KEY) === "viewer"
       ? "viewer"
@@ -268,7 +273,10 @@ let activeViewMode = (() => {
   } catch {
     return "split";
   }
-})();
+}
+
+/** @type {ViewMode} */
+let activeViewMode = resolveViewMode();
 document.documentElement.dataset.viewMode = activeViewMode;
 /** @type {"default" | "working" | "success" | "error"} */
 let copyActionState = "default";
@@ -348,6 +356,11 @@ function updateViewModeUi() {
 /** @param {ViewMode} mode */
 function setViewMode(mode) {
   activeViewMode = mode;
+  try {
+    history.replaceState(undefined, "", urlWithViewMode(location.href, mode));
+  } catch {
+    // The mode still applies if this context does not permit URL updates.
+  }
   try {
     localStorage.setItem(VIEW_MODE_STORAGE_KEY, mode);
   } catch {
@@ -1754,6 +1767,12 @@ dropZone.addEventListener("drop", async (event) => {
 });
 
 window.addEventListener("hashchange", loadHash);
+window.addEventListener("popstate", () => {
+  const mode = resolveViewMode();
+  if (mode === activeViewMode) return;
+  activeViewMode = mode;
+  updateViewModeUi();
+});
 window.addEventListener("beforeprint", updatePrintOrientation);
 window.addEventListener("afterprint", () => {
   document.title =

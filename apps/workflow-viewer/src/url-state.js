@@ -2,6 +2,35 @@ import { deflate, inflate, Inflate } from "pako";
 
 export const MAX_COMPRESSED_BYTES = 512 * 1024;
 export const MAX_DECOMPRESSED_BYTES = 2 * 1024 * 1024;
+export const VIEW_MODE_QUERY_PARAM = "view";
+
+/**
+ * Read the public URL value and translate it to the application's internal
+ * view-mode name.
+ * @param {string} search
+ * @returns {"split" | "viewer" | undefined}
+ */
+export function decodeViewMode(search) {
+  const value = new URLSearchParams(search).get(VIEW_MODE_QUERY_PARAM);
+  if (value === "split") return "split";
+  if (value === "preview") return "viewer";
+  return undefined;
+}
+
+/**
+ * Return a copy of the URL with the selected view mode, preserving all other
+ * query parameters and the shared-document hash.
+ * @param {string | URL} url
+ * @param {"split" | "viewer"} mode
+ */
+export function urlWithViewMode(url, mode) {
+  const nextUrl = new URL(url);
+  nextUrl.searchParams.set(
+    VIEW_MODE_QUERY_PARAM,
+    mode === "viewer" ? "preview" : "split",
+  );
+  return nextUrl;
+}
 
 export class UrlStateSizeWarning extends Error {
   /**
