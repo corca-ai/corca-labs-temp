@@ -10,6 +10,7 @@
     "build": "node scripts/build-pages.mjs",
     "check": "npm run check --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
+    "dev:opening": "npm run dev --workspace @corca-labs/open-ax-day-opening",
     "dev:board": "npm run dev --workspace @corca-labs/open-ax-day-board",
     "dev:workflow-viewer": "npm run dev --workspace @corca-labs/workflow-viewer",
     "dev:api": "npm run dev --workspace @corca-labs/board-api",

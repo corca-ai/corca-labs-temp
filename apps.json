@@ -1,5 +1,12 @@
 [
   {
+    "slug": "open-ax-day-opening",
+    "workspace": "@corca-labs/open-ax-day-opening",
+    "source": "apps/open-ax-day-opening/dist",
+    "title": "Open AX Day · 아이스브레이킹",
+    "description": "사전 준비 문서의 네 가지 아이스브레이킹 응답을 익명으로 살펴보는 오프닝 발표"
+  },
+  {
     "slug": "open-ax-day-board",
     "workspace": "@corca-labs/open-ax-day-board",
     "source": "apps/open-ax-day-board/dist",

@@ -4,6 +4,7 @@ Multi-app GitHub Pages repository for temporary Corca Labs tools.
 
 ## Apps
 
+- `open-ax-day-opening` → `/open-ax-day-opening/`
 - `open-ax-day-board` → `/open-ax-day-board/`
 - `workflow-viewer` → `/workflow-viewer/`
 
