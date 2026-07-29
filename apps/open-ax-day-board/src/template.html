@@ -1,0 +1,49 @@
+<main class="app">
+  <header>
+    <div class="brand"><small>Workshop constellation</small><h1>Open AX Day · People Canvas</h1></div>
+    <div class="count" id="count">7 people</div>
+    <label class="search"><span hidden>사람, 회사, 주제 검색</span><input id="search" type="search" placeholder="사람, 회사, 주제 검색…" autocomplete="off"><kbd>/</kbd></label>
+    <div class="tools">
+      <button class="icon-btn" id="exportMd" title="현재 그룹 구성을 Markdown 파일로 내보내기" aria-label="Markdown으로 내보내기">↓ <span class="label">MD</span></button>
+      <button class="icon-btn" id="exportJson" title="보드 상태를 JSON 파일로 내보내기" aria-label="JSON으로 내보내기">↓ <span class="label">JSON</span></button>
+      <button class="icon-btn" id="importJson" title="JSON 파일에서 보드 상태 가져오기" aria-label="JSON 가져오기">↑ <span class="label">Import</span></button>
+      <input id="jsonFile" type="file" accept="application/json,.json" hidden>
+      <button class="icon-btn" id="randomize" title="회사 다양성을 고려해 무작위 그룹 만들기" aria-label="무작위 그룹 만들기">⤨ <span class="label">Random</span></button>
+      <details class="settings" id="settings">
+        <summary class="icon-btn" aria-label="표시 설정">⚙ <span class="label">Settings</span></summary>
+        <div class="settings-menu">
+          <label class="setting-row">
+            <span class="setting-copy"><b>카드에 메모 표시</b><small>내부 메모를 카드 하단에 표시합니다.</small></span>
+            <input id="toggleNotes" type="checkbox">
+            <span class="switch" aria-hidden="true"></span>
+          </label>
+        </div>
+      </details>
+      <button class="icon-btn" id="arrange" title="카드와 그룹을 읽기 쉽게 정렬" aria-label="카드와 그룹 정렬">⌗ <span class="label">정렬</span></button>
+      <button class="icon-btn" id="undo" title="마지막 이동 또는 그룹 변경 실행 취소" aria-label="실행 취소">↶ <span class="label">Undo</span></button>
+      <button class="icon-btn" id="reset" title="보드 초기화" aria-label="보드 초기화">↺ <span class="label">Reset</span></button>
+    </div>
+  </header>
+  <dialog class="random-dialog" id="randomDialog">
+    <form class="random-form" id="randomForm">
+      <h2>Random grouping</h2>
+      <p>회사 다양성과 그룹 크기 균형을 우선해 참가자를 섞습니다. Corca 멤버는 제외됩니다.</p>
+      <label class="number-field">그룹 수<input id="randomGroupCount" type="number" min="1" step="1" required></label>
+      <div class="dialog-actions">
+        <button type="button" id="cancelRandom">취소</button>
+        <button class="primary" type="submit">그룹 만들기</button>
+      </div>
+    </form>
+  </dialog>
+  <section class="stage-wrap" aria-label="참가자 캔버스">
+    <div id="stage"></div>
+    <div class="empty" id="empty"><div><b>검색 결과가 없어요.</b><br>다른 이름이나 주제를 입력해 보세요.</div></div>
+    <div class="hint"><b>끌어서 그룹 만들기</b><span>· 흔들어서 분리 · 우클릭으로 그룹 해제 · 클릭으로 자세히</span></div>
+    <aside class="drawer" id="drawer" aria-hidden="true" aria-label="참가자 상세 정보">
+      <button class="close" id="close" aria-label="상세 정보 닫기">×</button>
+      <div id="drawerContent"></div>
+    </aside>
+    <div class="drawer-scrim" id="scrim"></div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </section>
+</main>

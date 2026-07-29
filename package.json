@@ -1,0 +1,23 @@
+{
+  "name": "corca-labs-temp",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "workers/*"
+  ],
+  "scripts": {
+    "build": "node scripts/build-pages.mjs",
+    "check": "npm run check --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "dev:board": "npm run dev --workspace @corca-labs/open-ax-day-board",
+    "dev:api": "npm run dev --workspace @corca-labs/board-api",
+    "deploy:api": "npm run deploy --workspace @corca-labs/board-api"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

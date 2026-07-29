@@ -1,0 +1,10 @@
+[
+  {
+    "slug": "open-ax-day-board",
+    "workspace": "@corca-labs/open-ax-day-board",
+    "source": "apps/open-ax-day-board/dist",
+    "title": "Open AX Day · People Canvas",
+    "description": "A collaborative canvas for grouping workshop participants and accumulating internal notes."
+  }
+]
+
