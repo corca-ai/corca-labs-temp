@@ -6,6 +6,9 @@
   --line: #c9c6bd;
   --soft-line: #dedbd2;
   --accent: #175f4c;
+  --ornament: rgba(23, 95, 76, 0.12);
+  --ornament-light: rgba(23, 95, 76, 0.055);
+  --warm-ornament: rgba(133, 91, 48, 0.08);
   font-family: Arial, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
   font-synthesis: none;
 }
@@ -21,7 +24,11 @@ body {
   min-height: 100%;
   margin: 0;
   overflow: hidden;
-  background: var(--paper);
+  background:
+    linear-gradient(rgba(24, 24, 23, 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(24, 24, 23, 0.018) 1px, transparent 1px),
+    var(--paper);
+  background-size: 32px 32px;
   color: var(--ink);
   word-break: keep-all;
 }
@@ -31,6 +38,9 @@ button {
 }
 
 .slide {
+  --trail-x: 66vw;
+  --trail-y: 13vh;
+  --trail-rotation: 8deg;
   position: absolute;
   inset: 0;
   display: grid;
@@ -44,6 +54,56 @@ button {
     opacity 180ms ease,
     transform 180ms ease,
     visibility 180ms;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.slide > * {
+  position: relative;
+  z-index: 2;
+}
+
+.slide::before,
+.slide::after {
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  content: "";
+}
+
+.slide::before {
+  top: -22vmax;
+  right: -28vmax;
+  width: 72vmax;
+  height: 72vmax;
+  border: 1px solid var(--ornament);
+  border-radius: 48% 52% 46% 54%;
+  box-shadow:
+    0 0 0 38px var(--ornament-light),
+    0 0 0 39px var(--ornament),
+    0 0 0 104px rgba(23, 95, 76, 0.025),
+    0 0 0 105px var(--ornament);
+  transform: rotate(-12deg);
+  animation: orbit-drift 24s ease-in-out infinite alternate;
+}
+
+.slide::after {
+  top: var(--trail-y);
+  left: var(--trail-x);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(23, 95, 76, 0.2);
+  box-shadow:
+    18px 3px 0 -1px rgba(23, 95, 76, 0.16),
+    38px 9px 0 -1px rgba(23, 95, 76, 0.14),
+    59px 18px 0 -1px rgba(23, 95, 76, 0.12),
+    79px 30px 0 -1px rgba(23, 95, 76, 0.1),
+    98px 45px 0 -1px rgba(23, 95, 76, 0.08),
+    115px 63px 0 -1px rgba(23, 95, 76, 0.06),
+    130px 84px 0 -1px rgba(23, 95, 76, 0.04);
+  transform: rotate(var(--trail-rotation));
+  animation: trail-breathe 7s ease-in-out infinite alternate;
 }
 
 .slide.is-active {
@@ -70,6 +130,24 @@ button {
 
 .slide-cover {
   grid-template-rows: auto 1fr auto;
+  background:
+    linear-gradient(115deg, transparent 0 72%, rgba(23, 95, 76, 0.025) 72% 72.2%, transparent 72.2%),
+    repeating-linear-gradient(115deg, transparent 0 58px, rgba(23, 95, 76, 0.026) 59px 60px, transparent 61px 118px);
+}
+
+.slide-cover::before {
+  top: auto;
+  right: -14vmax;
+  bottom: -47vmax;
+  width: 70vmax;
+  height: 70vmax;
+  border-radius: 50%;
+}
+
+.slide-cover::after {
+  --trail-x: 8vw;
+  --trail-y: 78vh;
+  --trail-rotation: -9deg;
 }
 
 .cover-copy {
@@ -118,6 +196,36 @@ h1 {
   letter-spacing: -0.05em;
 }
 
+.slide-intro {
+  background:
+    radial-gradient(circle at 18% 79%, var(--warm-ornament) 0 2px, transparent 3px),
+    radial-gradient(circle at 28% 72%, var(--warm-ornament) 0 1px, transparent 2px),
+    radial-gradient(circle at 39% 83%, var(--warm-ornament) 0 2px, transparent 3px),
+    radial-gradient(circle at 52% 75%, var(--warm-ornament) 0 1px, transparent 2px),
+    radial-gradient(circle at 64% 82%, var(--warm-ornament) 0 2px, transparent 3px),
+    radial-gradient(circle at 78% 74%, var(--warm-ornament) 0 1px, transparent 2px);
+}
+
+.slide-intro::before {
+  top: 19vh;
+  right: auto;
+  left: 7vw;
+  width: 86vw;
+  height: 44vh;
+  border: 0;
+  border-top: 1px dashed var(--ornament);
+  border-bottom: 1px dashed var(--warm-ornament);
+  border-radius: 50%;
+  box-shadow: none;
+  transform: rotate(-4deg);
+}
+
+.slide-intro::after {
+  --trail-x: 14vw;
+  --trail-y: 23vh;
+  --trail-rotation: 4deg;
+}
+
 .intro-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -130,6 +238,8 @@ h1 {
   display: grid;
   gap: 14px;
   padding: clamp(24px, 4vw, 56px);
+  background:
+    linear-gradient(135deg, transparent 48%, rgba(23, 95, 76, 0.038) 49%, transparent 50%) 0 0 / 22px 22px;
 }
 
 .intro-stat + .intro-stat {
@@ -157,6 +267,67 @@ h1 {
   grid-template-columns: minmax(310px, 0.85fr) minmax(560px, 1.6fr);
   grid-template-rows: 1fr;
   gap: clamp(36px, 6vw, 100px);
+}
+
+.slide-question::before {
+  top: auto;
+  right: auto;
+  bottom: -29vmax;
+  left: -25vmax;
+  width: 55vmax;
+  height: 55vmax;
+  border-radius: 50%;
+  opacity: 0.7;
+}
+
+.slide-question:nth-of-type(3) {
+  --trail-x: 8vw;
+  --trail-y: 19vh;
+  --trail-rotation: 24deg;
+  background:
+    linear-gradient(90deg, transparent 0 10%, rgba(23, 95, 76, 0.04) 10% 10.12%, transparent 10.12% 100%);
+}
+
+.slide-question:nth-of-type(4) {
+  --trail-x: 10vw;
+  --trail-y: 74vh;
+  --trail-rotation: -30deg;
+  background:
+    radial-gradient(ellipse at 16% 47%, transparent 0 40%, rgba(133, 91, 48, 0.055) 40.2% 40.45%, transparent 40.65%);
+}
+
+.slide-question:nth-of-type(4)::before {
+  left: -18vmax;
+  bottom: -22vmax;
+  border-radius: 42% 58% 63% 37%;
+}
+
+.slide-question:nth-of-type(5) {
+  --trail-x: 36vw;
+  --trail-y: 10vh;
+  --trail-rotation: 10deg;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 63px, rgba(23, 95, 76, 0.025) 64px 65px);
+}
+
+.slide-question:nth-of-type(5)::before {
+  left: -32vmax;
+  bottom: -38vmax;
+  border-radius: 50%;
+}
+
+.slide-question:nth-of-type(6) {
+  --trail-x: 5vw;
+  --trail-y: 64vh;
+  --trail-rotation: -18deg;
+  background:
+    radial-gradient(circle at 17% 15%, rgba(23, 95, 76, 0.045) 0 1px, transparent 2px) 0 0 / 18px 18px;
+}
+
+.slide-question:nth-of-type(6)::before {
+  left: -20vmax;
+  bottom: -31vmax;
+  border-radius: 58% 42% 47% 53%;
 }
 
 .question-copy {
@@ -193,7 +364,10 @@ h1 {
   justify-content: space-between;
   padding: clamp(28px, 5vw, 72px);
   border: 1px solid var(--line);
-  background: #fbfaf7;
+  background:
+    radial-gradient(circle at calc(100% - 32px) 32px, rgba(23, 95, 76, 0.13) 0 2px, transparent 3px),
+    linear-gradient(135deg, transparent 0 82%, rgba(23, 95, 76, 0.028) 82% 82.2%, transparent 82.2%),
+    #fbfaf7;
   font-size: clamp(32px, 4.2vw, 68px);
   font-weight: 600;
   line-height: 1.24;
@@ -241,7 +415,9 @@ h1 {
   border: 0;
   border-right: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
-  background: transparent;
+  background:
+    linear-gradient(135deg, transparent 0 88%, rgba(23, 95, 76, 0.025) 88% 88.4%, transparent 88.4%),
+    rgba(246, 245, 241, 0.86);
   font-size: clamp(15px, 1.35vw, 21px);
   line-height: 1.55;
   letter-spacing: 0;
@@ -257,6 +433,25 @@ h1 {
   padding: 0;
   list-style: none;
   border-top: 1px solid var(--line);
+}
+
+.slide-overview {
+  background:
+    repeating-radial-gradient(circle at 92% 87%, transparent 0 32px, rgba(23, 95, 76, 0.04) 33px 34px, transparent 35px 68px);
+}
+
+.slide-overview::before {
+  top: -42vmax;
+  right: -19vmax;
+  width: 68vmax;
+  height: 68vmax;
+  border-radius: 50%;
+}
+
+.slide-overview::after {
+  --trail-x: 70vw;
+  --trail-y: 16vh;
+  --trail-rotation: 35deg;
 }
 
 .question-list li {
@@ -281,6 +476,24 @@ h1 {
 
 .slide-end {
   grid-template-rows: auto 1fr;
+  background:
+    linear-gradient(90deg, transparent 0 49.9%, rgba(23, 95, 76, 0.045) 50%, transparent 50.1%),
+    linear-gradient(0deg, transparent 0 49.9%, rgba(23, 95, 76, 0.045) 50%, transparent 50.1%);
+}
+
+.slide-end::before {
+  top: 50%;
+  right: -24vmax;
+  width: 54vmax;
+  height: 54vmax;
+  border-radius: 50%;
+  transform: translateY(-50%);
+}
+
+.slide-end::after {
+  --trail-x: 9vw;
+  --trail-y: 81vh;
+  --trail-rotation: -6deg;
 }
 
 .end-copy {
@@ -358,6 +571,26 @@ h1 {
   color: var(--muted);
 }
 
+@keyframes orbit-drift {
+  from {
+    transform: rotate(-12deg) translate3d(0, 0, 0);
+  }
+  to {
+    transform: rotate(-8deg) translate3d(-12px, 9px, 0);
+  }
+}
+
+@keyframes trail-breathe {
+  from {
+    opacity: 0.45;
+    transform: rotate(var(--trail-rotation)) translateX(0);
+  }
+  to {
+    opacity: 0.9;
+    transform: rotate(var(--trail-rotation)) translateX(8px);
+  }
+}
+
 @media (max-width: 900px) {
   html,
   body {
@@ -426,7 +659,10 @@ h1 {
 
 @media (prefers-reduced-motion: reduce) {
   .slide,
+  .slide::before,
+  .slide::after,
   .responses li {
+    animation: none;
     transition: none;
   }
 }
