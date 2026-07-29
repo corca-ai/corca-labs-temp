@@ -124,7 +124,7 @@
   }
 
   html[data-view-mode="viewer"] .markdown-preview {
-    width: min(100%, 1100px);
+    --preview-text-width: 1100px;
   }
 
   .pane-header {
@@ -254,7 +254,8 @@
   }
 
   .markdown-preview {
-    width: min(100%, 900px);
+    --preview-text-width: 900px;
+    width: 100%;
     min-height: 360px;
     margin: 0 auto;
     color: var(--color-text);
@@ -341,6 +342,12 @@
     text-align: left;
   }
 
+  .markdown-preview > :not(.mermaid-diagram) {
+    max-width: var(--preview-text-width);
+    margin-right: auto;
+    margin-left: auto;
+  }
+
   .mermaid-diagram {
     width: 100%;
     margin: 1.5em 0;
@@ -356,7 +363,12 @@
 
   .mermaid-viewport {
     position: relative;
-    height: clamp(320px, 56vh, 680px);
+    height: max(
+      520px,
+      calc(
+        100dvh - var(--toolbar-height) - 58px - clamp(36px, 6vw, 84px)
+      )
+    );
     overflow: hidden;
     cursor: grab;
     outline: none;
@@ -703,6 +715,11 @@
 
     .preview-stage {
       min-height: 56vh;
+    }
+
+    .mermaid-viewport {
+      height: min(70svh, 640px);
+      min-height: 420px;
     }
   }
 }
