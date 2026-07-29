@@ -1,4 +1,9 @@
-import interact from "@interactjs/interactjs";
+import actions from "@interactjs/actions/plugin.js";
+import autoStart from "@interactjs/auto-start/plugin.js";
+import inertia from "@interactjs/inertia/plugin.js";
+import interact from "@interactjs/interact/index.js";
+import interactModifiers from "@interactjs/modifiers/all.js";
+import modifiersPlugin from "@interactjs/modifiers/plugin.js";
 import template from "./template.html?raw";
 import "./board.css";
 import { CloudflareBoardAdapter } from "./persistence/cloudflare";
@@ -12,6 +17,7 @@ import type { BoardState, PersistenceStatus } from "./persistence/types";
 declare global {
   interface Window {
     interact: typeof interact;
+    interactModifiers: typeof interactModifiers;
     boardPersistence?: {
       boardId: string;
       save(state: BoardState): void;
@@ -20,6 +26,14 @@ declare global {
 }
 
 const LEGACY_STORAGE_KEY = "openAxPeopleBoard";
+
+// The aggregate @interactjs/interactjs package marks its plugin-registration
+// side effects as removable. Register the required plugins explicitly so a
+// production tree-shaker cannot silently strip draggable/inertia/modifiers.
+interact.use(inertia);
+interact.use(modifiersPlugin);
+interact.use(autoStart);
+interact.use(actions);
 
 function resolveBoardId(): string {
   const url = new URL(window.location.href);
@@ -72,6 +86,7 @@ async function boot(): Promise<void> {
   }
 
   window.interact = interact;
+  window.interactModifiers = interactModifiers;
   window.boardPersistence = {
     boardId,
     save(state) {

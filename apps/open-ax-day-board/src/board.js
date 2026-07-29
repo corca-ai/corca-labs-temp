@@ -430,7 +430,7 @@ let toastTimer;function showToast(msg){toast.textContent=msg;toast.classList.add
 
 interact(".person").draggable({
   ignoreFrom:".card-note",
-  inertia:{resistance:18,minSpeed:250,endSpeed:60}, modifiers:[interact.modifiers.restrictRect({restriction:"parent",endOnly:true})],
+  inertia:{resistance:18,minSpeed:250,endSpeed:60}, modifiers:[interactModifiers.restrictRect({restriction:"parent",endOnly:true})],
   listeners:{
     start(e){
       state.dragStart=snapshot();state.moved=false;

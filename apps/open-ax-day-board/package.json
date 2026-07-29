@@ -8,10 +8,14 @@
     "build": "vite build",
     "check": "tsc --noEmit"
   },
-  "dependencies": {
-    "@interactjs/interactjs": "^1.10.27"
-  },
   "devDependencies": {
     "vite": "^8.1.5"
+  },
+  "dependencies": {
+    "@interactjs/actions": "1.10.27",
+    "@interactjs/auto-start": "1.10.27",
+    "@interactjs/inertia": "1.10.27",
+    "@interactjs/interact": "1.10.27",
+    "@interactjs/modifiers": "1.10.27"
   }
 }
