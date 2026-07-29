@@ -23,6 +23,7 @@ body {
   overflow: hidden;
   background: var(--paper);
   color: var(--ink);
+  word-break: keep-all;
 }
 
 button {
