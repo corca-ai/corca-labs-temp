@@ -67,7 +67,6 @@
             <button id="refresh-button" class="button" type="button" hidden>
               새로고침
             </button>
-            <span id="export-status" class="visually-hidden" role="status" aria-live="polite"></span>
           </div>
         </div>
         <div
@@ -89,12 +88,16 @@
           </div>
           <div class="preview-actions">
             <span id="local-badge" class="local-badge">브라우저 전용</span>
+            <button id="copy-png-button" class="button" type="button" disabled>
+              PNG 복사
+            </button>
             <button id="png-button" class="button" type="button" disabled>
               PNG 다운로드
             </button>
             <button id="print-button" class="button" type="button" disabled>
               인쇄 / PDF 저장
             </button>
+            <span id="export-status" class="visually-hidden" role="status" aria-live="polite"></span>
           </div>
         </div>
         <div class="preview-stage">

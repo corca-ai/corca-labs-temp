@@ -68,6 +68,10 @@ const COPY = {
     copying: "복사 중…",
     copied: "복사됨",
     copyFailed: "복사 실패",
+    copyPng: "PNG 복사",
+    copyingPng: "PNG 복사 중…",
+    copiedPng: "PNG 복사됨",
+    copyPngFailed: "PNG 복사 실패",
     downloadPng: "PNG 다운로드",
     preparingPng: "PNG 만드는 중…",
     downloadedPng: "PNG 저장됨",
@@ -115,6 +119,10 @@ const COPY = {
     copying: "Copying…",
     copied: "Copied",
     copyFailed: "Copy failed",
+    copyPng: "Copy PNG",
+    copyingPng: "Copying PNG…",
+    copiedPng: "PNG copied",
+    copyPngFailed: "PNG copy failed",
     downloadPng: "Download PNG",
     preparingPng: "Creating PNG…",
     downloadedPng: "PNG downloaded",
@@ -177,6 +185,7 @@ const languageOptions =
 const openButton = get.button("#open-button");
 const refreshButton = get.button("#refresh-button");
 const copyButton = get.button("#copy-button");
+const copyPngButton = get.button("#copy-png-button");
 const pngButton = get.button("#png-button");
 const printButton = get.button("#print-button");
 const exportStatus = get.element("#export-status");
@@ -249,9 +258,13 @@ document.documentElement.dataset.viewMode = activeViewMode;
 /** @type {"default" | "working" | "success" | "error"} */
 let copyActionState = "default";
 /** @type {"default" | "working" | "success" | "error"} */
+let copyPngActionState = "default";
+/** @type {"default" | "working" | "success" | "error"} */
 let pngActionState = "default";
 /** @type {number | undefined} */
 let copyResetTimer;
+/** @type {number | undefined} */
+let copyPngResetTimer;
 /** @type {number | undefined} */
 let pngResetTimer;
 
@@ -414,6 +427,14 @@ function updateExportActionLabels() {
         : copyActionState === "error"
           ? copy.copyFailed
           : copy.copy;
+  copyPngButton.textContent =
+    copyPngActionState === "working"
+      ? copy.copyingPng
+      : copyPngActionState === "success"
+        ? copy.copiedPng
+        : copyPngActionState === "error"
+          ? copy.copyPngFailed
+          : copy.copyPng;
   pngButton.textContent =
     pngActionState === "working"
       ? copy.preparingPng
@@ -425,11 +446,12 @@ function updateExportActionLabels() {
 }
 
 /**
- * @param {"copy" | "png"} action
+ * @param {"copy" | "copyPng" | "png"} action
  * @param {"default" | "working" | "success" | "error"} state
  */
 function setExportActionState(action, state) {
   if (action === "copy") copyActionState = state;
+  else if (action === "copyPng") copyPngActionState = state;
   else pngActionState = state;
   updateExportActionLabels();
 
@@ -443,6 +465,14 @@ function setExportActionState(action, state) {
           : state === "error"
             ? copy.copyFailed
             : ""
+      : action === "copyPng"
+        ? state === "working"
+          ? copy.copyingPng
+          : state === "success"
+            ? copy.copiedPng
+            : state === "error"
+              ? copy.copyPngFailed
+              : ""
       : state === "working"
         ? copy.preparingPng
         : state === "success"
@@ -455,6 +485,7 @@ function setExportActionState(action, state) {
 /** @param {boolean} disabled */
 function setPreviewActionsDisabled(disabled) {
   copyButton.disabled = disabled;
+  copyPngButton.disabled = disabled;
   pngButton.disabled = disabled;
   printButton.disabled = disabled;
 }
@@ -744,6 +775,15 @@ async function copyRenderedDocument() {
     return;
   }
   copyPreviewSelection();
+}
+
+async function copyRenderedPng() {
+  if (!navigator.clipboard?.write || !("ClipboardItem" in window)) {
+    throw new Error("PNG clipboard copy is unavailable in this browser.");
+  }
+  await navigator.clipboard.write([
+    new ClipboardItem({ "image/png": renderDocumentPng() }),
+  ]);
 }
 
 async function downloadRenderedPng() {
@@ -1044,6 +1084,23 @@ copyButton.addEventListener("click", async () => {
     copyButton.disabled = printButton.disabled;
     copyResetTimer = window.setTimeout(() => {
       setExportActionState("copy", "default");
+    }, 1_800);
+  }
+});
+copyPngButton.addEventListener("click", async () => {
+  window.clearTimeout(copyPngResetTimer);
+  copyPngButton.disabled = true;
+  setExportActionState("copyPng", "working");
+  try {
+    await copyRenderedPng();
+    setExportActionState("copyPng", "success");
+  } catch (problem) {
+    console.error(problem);
+    setExportActionState("copyPng", "error");
+  } finally {
+    copyPngButton.disabled = printButton.disabled;
+    copyPngResetTimer = window.setTimeout(() => {
+      setExportActionState("copyPng", "default");
     }, 1_800);
   }
 });
