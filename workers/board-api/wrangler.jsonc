@@ -9,11 +9,19 @@
       {
         "name": "BOARDS",
         "class_name": "BoardDurableObject"
+      },
+      {
+        "name": "REGISTRY",
+        "class_name": "BoardRegistryDurableObject"
       }
     ]
   },
   "exports": {
     "BoardDurableObject": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    },
+    "BoardRegistryDurableObject": {
       "type": "durable-object",
       "storage": "sqlite"
     }
@@ -23,4 +31,3 @@
     "head_sampling_rate": 1
   }
 }
-

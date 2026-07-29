@@ -39,7 +39,16 @@ export class BoardDurableObject extends DurableObject<Env> {
     };
   }
 
-  putBoard(state: Record<string, unknown>): StoredBoard {
+  putBoard(
+    state: Record<string, unknown>,
+    expectedRevision: number,
+    force: boolean,
+  ): StoredBoard | null {
+    const current = this.getBoard();
+    if (!force && expectedRevision !== (current?.revision ?? -1)) {
+      return null;
+    }
+
     const stateJson = JSON.stringify(state);
     const updatedAt = new Date().toISOString();
     const row = this.ctx.storage.sql

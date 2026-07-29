@@ -1,4 +1,5 @@
 export { BoardDurableObject } from "./board-durable-object";
+export { BoardRegistryDurableObject } from "./board-registry-durable-object";
 
 const MAX_BODY_BYTES = 1_048_576;
 const BOARD_ID_PATTERN = /^[a-zA-Z0-9_-]{8,80}$/;
@@ -46,6 +47,10 @@ function isBoardState(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function isExpectedRevision(value: unknown): value is number | null | undefined {
+  return value === undefined || value === null || (Number.isInteger(value) && Number(value) >= 0);
+}
+
 export default {
   async fetch(request, env): Promise<Response> {
     if (request.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -69,7 +74,29 @@ export default {
         if (!isBoardState(body) || !isBoardState(body.state)) {
           return json({ error: "Expected a JSON object with a state object" }, { status: 400 });
         }
-        const stored = await board.putBoard(body.state);
+        if (!isExpectedRevision(body.expectedRevision) || (body.force !== undefined && typeof body.force !== "boolean")) {
+          return json({ error: "Invalid revision precondition" }, { status: 400 });
+        }
+
+        const current = await board.getBoard();
+        if (!current) {
+          const registry = env.REGISTRY.getByName("cloud-boards-v1");
+          const reservation = await registry.reserveBoard(boardId);
+          if (!reservation.accepted) {
+            return json({ error: "Cloud board unavailable" }, { status: 503 });
+          }
+        }
+
+        // Requests from the pre-workspace client omitted a revision. Preserve
+        // compatibility during rollout; current clients always send one.
+        const force = body.force === true || body.expectedRevision === undefined;
+        const stored = await board.putBoard(body.state, body.expectedRevision ?? -1, force);
+        if (!stored) {
+          return json(
+            { error: "Revision conflict", current: await board.getBoard() },
+            { status: 409 },
+          );
+        }
         return json(stored);
       } catch (error) {
         if (error instanceof RangeError) {
@@ -82,4 +109,3 @@ export default {
     return json({ error: "Method not allowed" }, { status: 405 });
   },
 } satisfies ExportedHandler<Env>;
-
