@@ -482,7 +482,7 @@
   .mermaid-diagram.is-highlighted .node,
   .mermaid-diagram.is-highlighted path[data-edge="true"],
   .mermaid-diagram.is-highlighted .edgeLabels > .edgeLabel {
-    opacity: 0.16;
+    opacity: 0.38;
   }
 
   .mermaid-diagram.is-highlighted .node.is-selected,

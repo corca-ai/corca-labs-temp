@@ -9,7 +9,7 @@ import {
   UrlStateSizeWarning,
 } from "./url-state.js";
 import DOMPurify from "dompurify";
-import { toBlob, toPng } from "html-to-image";
+import { toBlob } from "html-to-image";
 import { marked } from "marked";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api.js";
 import "monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution.js";
@@ -675,55 +675,203 @@ function inlineClipboardStyles(source, target) {
   }
 }
 
+/**
+ * Crop a rendered PNG to pixels that differ materially from its background.
+ * @param {Blob} blob
+ * @param {number} padding
+ * @returns {Promise<Blob>}
+ */
+async function cropPngToContent(blob, padding) {
+  const bitmap = await createImageBitmap(blob);
+  const sourceCanvas = document.createElement("canvas");
+  sourceCanvas.width = bitmap.width;
+  sourceCanvas.height = bitmap.height;
+  const sourceContext = sourceCanvas.getContext("2d", {
+    willReadFrequently: true,
+  });
+  if (!sourceContext) throw new Error("Could not inspect the rendered PNG.");
+  sourceContext.drawImage(bitmap, 0, 0);
+  bitmap.close();
+
+  const pixels = sourceContext.getImageData(
+    0,
+    0,
+    sourceCanvas.width,
+    sourceCanvas.height,
+  ).data;
+  const background = [pixels[0], pixels[1], pixels[2]];
+  let minX = sourceCanvas.width;
+  let minY = sourceCanvas.height;
+  let maxX = -1;
+  let maxY = -1;
+
+  for (let y = 0; y < sourceCanvas.height; y += 1) {
+    for (let x = 0; x < sourceCanvas.width; x += 1) {
+      const offset = (y * sourceCanvas.width + x) * 4;
+      if (pixels[offset + 3] < 16) continue;
+      const differsFromBackground =
+        Math.abs(pixels[offset] - background[0]) > 40 ||
+        Math.abs(pixels[offset + 1] - background[1]) > 40 ||
+        Math.abs(pixels[offset + 2] - background[2]) > 40;
+      if (!differsFromBackground) continue;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+    }
+  }
+
+  if (maxX < minX || maxY < minY) return blob;
+  const contentWidth = maxX - minX + 1;
+  const contentHeight = maxY - minY + 1;
+  const outputCanvas = document.createElement("canvas");
+  outputCanvas.width = contentWidth + padding * 2;
+  outputCanvas.height = contentHeight + padding * 2;
+  const outputContext = outputCanvas.getContext("2d");
+  if (!outputContext) throw new Error("Could not crop the rendered PNG.");
+  outputContext.fillStyle = `rgb(${background.join(",")})`;
+  outputContext.fillRect(0, 0, outputCanvas.width, outputCanvas.height);
+  outputContext.drawImage(
+    sourceCanvas,
+    minX,
+    minY,
+    contentWidth,
+    contentHeight,
+    padding,
+    padding,
+    contentWidth,
+    contentHeight,
+  );
+  const croppedBlob = await new Promise((resolve, reject) => {
+    outputCanvas.toBlob(
+      (result) =>
+        result
+          ? resolve(result)
+          : reject(new Error("Could not encode the cropped PNG.")),
+      "image/png",
+    );
+  });
+  return /** @type {Blob} */ (croppedBlob);
+}
+
+/**
+ * @param {Blob} blob
+ * @returns {Promise<string>}
+ */
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => resolve(String(reader.result)));
+    reader.addEventListener("error", () => reject(reader.error));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function waitForDiagramVisualState() {
+  if (!preview.querySelector(".mermaid-diagram.is-highlighted")) return;
+  await new Promise((resolve) => window.setTimeout(resolve, 160));
+}
+
+function pinDiagramHighlightForExport() {
+  const elements = Array.from(
+    preview.querySelectorAll(
+      ".mermaid-diagram.is-highlighted .node, " +
+        ".mermaid-diagram.is-highlighted path[data-edge='true'], " +
+        ".mermaid-diagram.is-highlighted .edgeLabels > .edgeLabel",
+    ),
+  );
+  const originals = elements.map((element) => ({
+    element,
+    opacity: element.getAttribute("opacity"),
+    style: element.getAttribute("style"),
+  }));
+  for (const element of elements) {
+    const computed = getComputedStyle(element);
+    element.setAttribute("opacity", computed.opacity);
+    if (
+      element instanceof HTMLElement ||
+      element instanceof SVGElement
+    ) {
+      element.style.setProperty("opacity", computed.opacity, "important");
+      if (computed.filter !== "none") {
+        element.style.setProperty("filter", computed.filter, "important");
+      }
+    }
+  }
+  return () => {
+    for (const { element, opacity, style } of originals) {
+      if (opacity === null) element.removeAttribute("opacity");
+      else element.setAttribute("opacity", opacity);
+      if (style === null) element.removeAttribute("style");
+      else element.setAttribute("style", style);
+    }
+  };
+}
+
 /** @returns {Promise<Blob>} */
 async function renderDocumentPng() {
-  clearDiagramHighlight();
   await document.fonts.ready;
+  await waitForDiagramVisualState();
   const bounds = preview.getBoundingClientRect();
-  const padding = 32;
-  const width = Math.ceil(Math.max(bounds.width, preview.scrollWidth)) + padding * 2;
-  const height =
-    Math.ceil(Math.max(bounds.height, preview.scrollHeight)) + padding * 2;
-  const blob = await toBlob(preview, {
-    backgroundColor: "#ffffff",
-    cacheBust: true,
-    height,
-    pixelRatio: 2,
-    style: {
-      boxSizing: "border-box",
-      margin: "0",
-      maxWidth: "none",
-      minHeight: "0",
-      overflow: "visible",
-      padding: `${padding}px`,
-    },
-    width,
-  });
+  const width = Math.ceil(Math.max(bounds.width, preview.scrollWidth));
+  const height = Math.ceil(Math.max(bounds.height, preview.scrollHeight));
+  const restoreHighlight = pinDiagramHighlightForExport();
+  let blob;
+  try {
+    blob = await toBlob(preview, {
+      backgroundColor: "#ffffff",
+      cacheBust: true,
+      height,
+      pixelRatio: 2,
+      style: {
+        boxSizing: "border-box",
+        margin: "0",
+        maxWidth: "none",
+        minHeight: "0",
+        overflow: "visible",
+        padding: "0",
+      },
+      width,
+    });
+  } finally {
+    restoreHighlight();
+  }
   if (!blob) throw new Error("Could not render the document as PNG.");
-  return blob;
+  return cropPngToContent(blob, 32);
 }
 
 /** @returns {Promise<string>} */
 async function createClipboardHtml() {
-  clearDiagramHighlight();
   await document.fonts.ready;
-  const clone = /** @type {HTMLElement} */ (preview.cloneNode(true));
-  inlineClipboardStyles(preview, clone);
+  await waitForDiagramVisualState();
+  const restoreHighlight = pinDiagramHighlightForExport();
+  let clone;
+  let diagramImages;
+  try {
+    clone = /** @type {HTMLElement} */ (preview.cloneNode(true));
+    inlineClipboardStyles(preview, clone);
 
-  const sourceDiagrams = Array.from(
-    preview.querySelectorAll(".mermaid-diagram"),
-  );
+    const sourceDiagrams = Array.from(
+      preview.querySelectorAll(".mermaid-diagram"),
+    );
+    diagramImages = await Promise.all(
+      sourceDiagrams.map(async (diagram) => {
+        const blob = await toBlob(/** @type {HTMLElement} */ (diagram), {
+          backgroundColor: "#ffffff",
+          cacheBust: true,
+          pixelRatio: 2,
+        });
+        if (!blob) {
+          throw new Error("Could not render a Mermaid diagram as PNG.");
+        }
+        return blobToDataUrl(await cropPngToContent(blob, 24));
+      }),
+    );
+  } finally {
+    restoreHighlight();
+  }
   const cloneDiagrams = Array.from(
     clone.querySelectorAll(".mermaid-diagram"),
-  );
-  const diagramImages = await Promise.all(
-    sourceDiagrams.map((diagram) =>
-      toPng(/** @type {HTMLElement} */ (diagram), {
-        backgroundColor: "#ffffff",
-        cacheBust: true,
-        pixelRatio: 2,
-      }),
-    ),
   );
   for (const [index, dataUrl] of diagramImages.entries()) {
     const diagram = cloneDiagrams[index];
@@ -1129,17 +1277,14 @@ printButton.addEventListener("click", () => {
 
 document.addEventListener("click", (event) => {
   const target = event.target;
-  if (!(target instanceof Element)) {
-    clearDiagramHighlight();
-    return;
-  }
+  if (!(target instanceof Element)) return;
   const selectedNode = target.closest(".mermaid-diagram .node.proc");
   const diagram = selectedNode?.closest(".mermaid-diagram");
   if (selectedNode && diagram) {
     highlightDiagramNeighborhood(diagram, selectedNode);
     return;
   }
-  clearDiagramHighlight();
+  if (target.closest("#preview")) clearDiagramHighlight();
 });
 
 document.addEventListener("keydown", (event) => {
