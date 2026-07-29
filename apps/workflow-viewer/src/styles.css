@@ -37,8 +37,7 @@
     margin: 0;
   }
 
-  button,
-  textarea {
+  button {
     font: inherit;
   }
 }
@@ -131,6 +130,14 @@
     min-width: 0;
   }
 
+  .editor-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+
   .preview-stage {
     position: relative;
     min-height: 430px;
@@ -214,18 +221,11 @@
     letter-spacing: 0.02em;
   }
 
-  .editor {
+  .editor-host {
     width: 100%;
     min-height: 430px;
-    padding: 22px;
-    resize: none;
-    color: #1d2925;
     background: var(--color-paper);
-    border: 0;
-    border-radius: 0;
-    caret-color: var(--color-accent);
-    font: 14px/1.65 var(--font-code);
-    tab-size: 4;
+    overflow: hidden;
   }
 
   .privacy-note {
@@ -436,12 +436,12 @@
 
   .button:focus-visible,
   .language-option:focus-visible,
-  .editor:focus-visible {
+  .editor-host:focus-within {
     outline: 3px solid rgb(15 126 110 / 24%);
     outline-offset: 2px;
   }
 
-  .editor:focus {
+  .editor-host:focus-within {
     outline-offset: -3px;
   }
 
@@ -496,12 +496,7 @@
     }
 
     .actions {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-    }
-
-    .button-primary {
-      grid-column: 1 / -1;
+      display: flex;
     }
 
     .workspace {
@@ -513,9 +508,8 @@
       min-height: auto;
     }
 
-    .editor {
+    .editor-host {
       min-height: 42vh;
-      resize: vertical;
     }
 
     .preview-stage {

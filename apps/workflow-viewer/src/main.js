@@ -3,20 +3,52 @@ import {
   filenameStem,
   isMarkdownFilename,
 } from "./workflow.js";
-import { decodeUrlState, encodePakoState } from "./url-state.js";
+import {
+  decodeUrlState,
+  encodePakoState,
+  UrlStateSizeWarning,
+} from "./url-state.js";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
+import * as monaco from "monaco-editor/esm/vs/editor/editor.api.js";
+import "monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution.js";
+import EditorWorker from "monaco-editor/esm/vs/editor/editor.worker.js?worker";
+
+const monacoGlobal =
+  /** @type {typeof globalThis & { MonacoEnvironment: { getWorker: () => Worker } }} */ (
+    globalThis
+  );
+monacoGlobal.MonacoEnvironment = {
+  getWorker: () => new EditorWorker(),
+};
 
 const MERMAID_URL =
   "https://cdn.jsdelivr.net/npm/mermaid@11.12.0/dist/mermaid.esm.min.mjs";
 const POLL_INTERVAL_MS = 1_500;
 const EDIT_DELAY_MS = 220;
 const HASH_DELAY_MS = 320;
-const DEFAULT_CODE = `# Example workflow
+const DEFAULT_CODE = `# 문의 처리 흐름
 
 \`\`\`mermaid
-flowchart LR
-    input[Input] --> process[Process] --> output[Output]
+flowchart TD
+    문의[("고객 문의")]
+    분류[["문의 분류"]]:::proc
+    분류결과[("분류 결과")]
+    답변작성[["답변 작성"]]:::proc
+    답변초안[("답변 초안")]
+    답변검토[["답변 검토"]]:::proc
+    검토결과[("검토 결과")]
+    답변발송[["답변 발송"]]:::proc
+    발송기록[("발송 기록")]
+    응대지침[("응대 지침")]
+
+    문의 --> 분류 --> 분류결과 --> 답변작성 --> 답변초안
+    답변초안 --> 답변검토 --> 검토결과 --> 답변발송 --> 발송기록
+    응대지침 -.-> 분류
+    응대지침 -.-> 답변작성
+    응대지침 -.-> 답변검토
+
+    classDef proc fill:#e1f5fe,stroke:#01579b,stroke-width:2px,color:#000
 \`\`\``;
 
 const COPY = {
@@ -24,7 +56,7 @@ const COPY = {
     title: "워크플로 뷰어",
     description: "Mermaid를 지원하는 Markdown 문서를 편집하고 실시간으로 미리 보세요.",
     languageLabel: "언어 선택",
-    open: "워크플로 열기",
+    open: "MD 파일 불러오기",
     refresh: "새로고침",
     chooseAgain: "다시 선택",
     print: "인쇄 / PDF 저장",
@@ -43,6 +75,8 @@ const COPY = {
     errorTitle: "Mermaid 블록을 확인해 주세요",
     live: "실시간 미리보기 · URL 동기화됨",
     urlError: "공유 URL을 읽지 못해 예제 그래프를 열었습니다",
+    sizeBlocked: "큰 공유 문서를 불러오지 않고 예제 그래프를 열었습니다",
+    sizeWarning: "이 공유 링크는 안전한 자동 로드 크기를 초과합니다. 신뢰할 수 있는 링크일 때만 계속하세요.\n\n그래도 불러올까요?",
     watching: (/** @type {string} */ time) => `파일 변경 확인 중 · ${time} 업데이트`,
     fallback: (/** @type {string} */ time) => `${time} 업데이트 · 변경 사항을 읽으려면 파일을 다시 선택하세요`,
     attention: "Mermaid 블록을 확인해 주세요",
@@ -58,7 +92,7 @@ const COPY = {
     title: "Workflow viewer",
     description: "Edit and preview Markdown with Mermaid diagram support.",
     languageLabel: "Choose language",
-    open: "Open workflow",
+    open: "Load MD file",
     refresh: "Refresh",
     chooseAgain: "Choose again",
     print: "Print / Save PDF",
@@ -77,6 +111,8 @@ const COPY = {
     errorTitle: "Check the Mermaid block",
     live: "Live preview · URL synced",
     urlError: "Could not read the shared URL, so the example graph was opened",
+    sizeBlocked: "The large shared document was not loaded; the example graph was opened",
+    sizeWarning: "This shared link exceeds the safe automatic-load size. Continue only if you trust its source.\n\nLoad it anyway?",
     watching: (/** @type {string} */ time) => `Watching file changes · Updated ${time}`,
     fallback: (/** @type {string} */ time) => `Updated ${time} · Choose the file again to reread changes`,
     attention: "Check the Mermaid block",
@@ -91,7 +127,7 @@ const COPY = {
 };
 
 /** @typedef {"ko" | "en"} Language */
-/** @typedef {"live" | "urlError" | "watching" | "fallback" | "attention" | "accessPaused"} StatusMode */
+/** @typedef {"live" | "urlError" | "sizeBlocked" | "watching" | "fallback" | "attention" | "accessPaused"} StatusMode */
 
 const get = {
   element: (/** @type {string} */ selector) =>
@@ -114,7 +150,7 @@ const printButton = get.button("#print-button");
 const fileInput =
   /** @type {HTMLInputElement} */ (document.querySelector("#file-input"));
 const dropZone = get.element("#drop-zone");
-const editor = /** @type {HTMLTextAreaElement} */ (document.querySelector("#editor"));
+const editorHost = get.element("#editor");
 const editorTitle = get.element("#editor-title");
 const editorNote = get.element("#editor-note");
 const urlBadge = get.element("#url-badge");
@@ -164,6 +200,41 @@ let renderTimer;
 let hashTimer;
 let currentStem = "workflow";
 let currentFilename = "";
+/** @type {string | undefined} */
+let programmaticEditorValue;
+
+const codeEditor = monaco.editor.create(editorHost, {
+  value: "",
+  language: "markdown",
+  theme: "vs",
+  automaticLayout: true,
+  ariaLabel: COPY.ko.editorLabel,
+  fontFamily:
+    'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace',
+  fontSize: 14,
+  lineHeight: 23,
+  minimap: { enabled: false },
+  wordWrap: "on",
+  wrappingIndent: "same",
+  scrollBeyondLastLine: false,
+  smoothScrolling: true,
+  padding: { top: 18, bottom: 18 },
+  renderLineHighlight: "line",
+  guides: { indentation: true },
+  overviewRulerLanes: 0,
+  hideCursorInOverviewRuler: true,
+  accessibilitySupport: "auto",
+});
+
+/** @param {string} value */
+function setEditorValue(value) {
+  if (codeEditor.getValue() === value) {
+    programmaticEditorValue = undefined;
+    return;
+  }
+  programmaticEditorValue = value;
+  codeEditor.setValue(value);
+}
 
 /** @param {Date} date */
 function formattedTime(date) {
@@ -186,9 +257,11 @@ function updateStatus() {
         ? copy.live
         : statusMode === "urlError"
           ? copy.urlError
-          : statusMode === "attention"
-            ? copy.attention
-            : copy.accessPaused;
+          : statusMode === "sizeBlocked"
+            ? copy.sizeBlocked
+            : statusMode === "attention"
+              ? copy.attention
+              : copy.accessPaused;
   }
 }
 
@@ -228,7 +301,7 @@ function applyTranslations() {
   fileInput.setAttribute("aria-label", copy.fileInputLabel);
   editorTitle.textContent = copy.editorTitle;
   editorNote.textContent = copy.editorNote;
-  editor.setAttribute("aria-label", copy.editorLabel);
+  codeEditor.updateOptions({ ariaLabel: copy.editorLabel });
   urlBadge.textContent = copy.urlBadge;
   previewTitle.textContent = copy.previewTitle;
   preview.setAttribute("aria-label", copy.diagramLabel);
@@ -396,7 +469,7 @@ async function renderMarkdown(markdown, successMode, successTime) {
 function scheduleEditorRender() {
   window.clearTimeout(renderTimer);
   renderTimer = window.setTimeout(() => {
-    void renderMarkdown(editor.value, "live");
+    void renderMarkdown(codeEditor.getValue(), "live");
   }, EDIT_DELAY_MS);
 }
 
@@ -415,7 +488,7 @@ function detachFile() {
  */
 function applyEditorCode(content, mode, time, syncHash = true) {
   const markdown = normalizeMarkdownInput(content);
-  editor.value = markdown;
+  setEditorValue(markdown);
   if (syncHash) scheduleHashUpdate(markdown);
   void renderMarkdown(markdown, mode, time);
 }
@@ -500,7 +573,19 @@ async function pollForChanges() {
 
 function loadHash() {
   try {
-    const state = decodeUrlState(location.hash);
+    let state;
+    try {
+      state = decodeUrlState(location.hash);
+    } catch (problem) {
+      if (!(problem instanceof UrlStateSizeWarning)) throw problem;
+      if (!window.confirm(COPY[activeLanguage].sizeWarning)) {
+        setFilename("");
+        setEditorValue(DEFAULT_CODE);
+        void renderMarkdown(DEFAULT_CODE, "sizeBlocked");
+        return;
+      }
+      state = decodeUrlState(location.hash, { allowOversize: true });
+    }
     if (state !== undefined) {
       setFilename(state.filename ?? "");
       applyEditorCode(state.code, "live", undefined, false);
@@ -510,7 +595,7 @@ function loadHash() {
     applyEditorCode(DEFAULT_CODE, "live", undefined, false);
   } catch {
     setFilename("");
-    editor.value = DEFAULT_CODE;
+    setEditorValue(DEFAULT_CODE);
     void renderMarkdown(DEFAULT_CODE, "urlError");
   }
 }
@@ -538,18 +623,19 @@ printButton.addEventListener("click", () => {
   window.print();
 });
 
-editor.addEventListener("input", () => {
+codeEditor.onDidChangeModelContent(() => {
+  if (
+    programmaticEditorValue !== undefined &&
+    codeEditor.getValue() === programmaticEditorValue
+  ) {
+    programmaticEditorValue = undefined;
+    return;
+  }
+  programmaticEditorValue = undefined;
   detachFile();
   setStatus("live");
   scheduleEditorRender();
-  scheduleHashUpdate(editor.value);
-});
-editor.addEventListener("keydown", (event) => {
-  if (event.key !== "Tab") return;
-  event.preventDefault();
-  const start = editor.selectionStart;
-  editor.setRangeText("    ", start, editor.selectionEnd, "end");
-  editor.dispatchEvent(new Event("input", { bubbles: true }));
+  scheduleHashUpdate(codeEditor.getValue());
 });
 
 fileInput.addEventListener("change", () => {

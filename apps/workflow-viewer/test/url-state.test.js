@@ -2,7 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { deflate } from "pako";
 
-import { decodeUrlState, encodePakoState } from "../src/url-state.js";
+import {
+  decodeUrlState,
+  encodePakoState,
+  MAX_COMPRESSED_BYTES,
+  MAX_DECOMPRESSED_BYTES,
+  UrlStateSizeWarning,
+} from "../src/url-state.js";
 
 function base64Url(bytes) {
   return Buffer.from(bytes).toString("base64url");
@@ -68,4 +74,32 @@ test("strips path components from untrusted shared filenames", () => {
     decodeUrlState(`base64:${Buffer.from(state).toString("base64url")}`),
     { code: "flowchart LR\n  A --> B", filename: "FLOW_safe.md" },
   );
+});
+
+test("gates oversized compressed input before base64 decoding", () => {
+  assert.throws(
+    () =>
+      decodeUrlState(
+        `pako:${"A".repeat(Math.ceil(MAX_COMPRESSED_BYTES / 3) * 4 + 1)}`,
+      ),
+    (problem) =>
+      problem instanceof UrlStateSizeWarning &&
+      problem.stage === "compressed",
+  );
+});
+
+test("gates decompressed pako output and permits explicit override", () => {
+  const code = "A".repeat(MAX_DECOMPRESSED_BYTES + 1);
+  const fragment = encodePakoState(code, "large.md");
+
+  assert.throws(
+    () => decodeUrlState(fragment),
+    (problem) =>
+      problem instanceof UrlStateSizeWarning &&
+      problem.stage === "decompressed",
+  );
+  assert.deepEqual(decodeUrlState(fragment, { allowOversize: true }), {
+    code,
+    filename: "large.md",
+  });
 });

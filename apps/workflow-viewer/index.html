@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"
+      content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; worker-src 'self' blob:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"
     >
     <meta
       id="page-description"
@@ -32,12 +32,6 @@
       </div>
 
       <div class="actions">
-        <button id="open-button" class="button button-primary" type="button" disabled>
-          워크플로 열기
-        </button>
-        <button id="refresh-button" class="button" type="button" hidden>
-          새로고침
-        </button>
         <button id="print-button" class="button" type="button" disabled>
           인쇄 / PDF 저장
         </button>
@@ -56,19 +50,24 @@
       <section class="editor-panel pane" aria-labelledby="editor-title">
         <div class="pane-header">
           <div>
-          <h2 id="editor-title">Markdown 편집기</h2>
+            <h2 id="editor-title">Markdown 편집기</h2>
             <span id="editor-note" class="pane-note">입력하는 동안 미리보기가 자동으로 업데이트됩니다.</span>
           </div>
-          <span id="url-badge" class="url-badge">URL 동기화</span>
+          <div class="editor-actions">
+            <span id="url-badge" class="url-badge">URL 동기화</span>
+            <button id="open-button" class="button button-primary" type="button" disabled>
+              MD 파일 불러오기
+            </button>
+            <button id="refresh-button" class="button" type="button" hidden>
+              새로고침
+            </button>
+          </div>
         </div>
-        <textarea
+        <div
           id="editor"
-          class="editor"
+          class="editor-host"
           aria-label="Mermaid를 지원하는 Markdown 문서"
-          autocomplete="off"
-          autocapitalize="off"
-          spellcheck="false"
-        ></textarea>
+        ></div>
         <p id="privacy-note" class="privacy-note">
           로컬 파일은 업로드되지 않습니다. 공유 링크의 내용은 URL 조각에만 저장됩니다.
         </p>
