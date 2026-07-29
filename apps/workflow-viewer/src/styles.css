@@ -82,16 +82,10 @@
     margin-right: auto;
   }
 
-  .actions,
   .language-switch {
     display: flex;
     flex: none;
     gap: 7px;
-  }
-
-  .actions {
-    flex-wrap: wrap;
-    justify-content: flex-end;
   }
 
   .workspace {
@@ -135,7 +129,8 @@
     min-width: 0;
   }
 
-  .editor-actions {
+  .editor-actions,
+  .preview-actions {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -531,12 +526,18 @@
       right: 15px;
     }
 
-    .actions {
-      display: flex;
-      width: 100%;
+    .pane-header {
+      flex-wrap: wrap;
     }
 
-    .actions .button {
+    .editor-actions,
+    .preview-actions {
+      width: 100%;
+      justify-content: flex-start;
+    }
+
+    .editor-actions .button,
+    .preview-actions .button {
       flex: 1 1 auto;
     }
 
