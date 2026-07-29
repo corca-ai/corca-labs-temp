@@ -1,123 +1,130 @@
 <main class="app">
   <header>
     <button class="document-toggle" id="documentToggle" type="button" aria-controls="documentSidebar" aria-expanded="false">
-      <span aria-hidden="true">▤</span> Document
+      <span aria-hidden="true">▤</span> <span data-i18n="document.open">문서</span>
     </button>
     <div class="brand">
-      <small id="documentKicker">Local workspace</small>
+      <small id="documentKicker">로컬 작업공간</small>
       <div class="document-title-row">
-        <h1 id="documentTitle">Untitled board</h1>
-        <span class="sync-status" id="syncStatus" role="status" aria-live="polite">Local only</span>
+        <h1 id="documentTitle">제목 없는 보드</h1>
+        <span class="sync-status" id="syncStatus" role="status" aria-live="polite">로컬 전용</span>
       </div>
     </div>
-    <div class="count" id="count">7 people</div>
-    <label class="search"><span hidden>사람, 회사, 주제 검색</span><input id="search" type="search" placeholder="사람, 회사, 주제 검색…" autocomplete="off"><kbd>/</kbd></label>
+    <div class="count" id="count">7명</div>
+    <label class="search"><span hidden data-i18n="search.label">사람, 회사, 주제 검색</span><input id="search" type="search" placeholder="사람, 회사, 주제 검색…" data-i18n-placeholder="search.placeholder" autocomplete="off"><kbd>/</kbd></label>
     <div class="tools">
-      <button class="icon-btn" id="exportMd" title="현재 그룹 구성을 Markdown 파일로 내보내기" aria-label="Markdown으로 내보내기">↓ <span class="label">MD</span></button>
-      <button class="icon-btn" id="exportJson" title="보드 상태를 JSON 파일로 내보내기" aria-label="JSON으로 내보내기">↓ <span class="label">JSON</span></button>
-      <button class="icon-btn" id="importJson" title="JSON 파일에서 보드 상태 가져오기" aria-label="JSON 가져오기">↑ <span class="label">Import</span></button>
+      <button class="icon-btn" id="exportMd" title="현재 그룹 구성을 Markdown 파일로 내보내기" data-i18n-title="toolbar.exportMdTitle" aria-label="Markdown으로 내보내기" data-i18n-aria-label="toolbar.exportMdLabel">↓ <span class="label">MD</span></button>
+      <button class="icon-btn" id="exportJson" title="보드 상태를 JSON 파일로 내보내기" data-i18n-title="toolbar.exportJsonTitle" aria-label="JSON으로 내보내기" data-i18n-aria-label="toolbar.exportJsonLabel">↓ <span class="label">JSON</span></button>
+      <button class="icon-btn" id="importJson" title="JSON 파일에서 보드 상태 가져오기" data-i18n-title="toolbar.importJsonTitle" aria-label="JSON 가져오기" data-i18n-aria-label="toolbar.importJsonLabel">↑ <span class="label" data-i18n="toolbar.import">가져오기</span></button>
       <input id="jsonFile" type="file" accept="application/json,.json" hidden>
-      <button class="icon-btn" id="randomize" title="회사 다양성을 고려해 무작위 그룹 만들기" aria-label="무작위 그룹 만들기">⤨ <span class="label">Random</span></button>
+      <button class="icon-btn" id="randomize" title="회사 다양성을 고려해 무작위 그룹 만들기" data-i18n-title="toolbar.randomTitle" aria-label="무작위 그룹 만들기" data-i18n-aria-label="toolbar.randomLabel">⤨ <span class="label" data-i18n="toolbar.random">무작위</span></button>
       <details class="settings" id="settings">
-        <summary class="icon-btn" aria-label="표시 설정">⚙ <span class="label">Settings</span></summary>
+        <summary class="icon-btn" aria-label="표시 설정" data-i18n-aria-label="toolbar.settingsLabel">⚙ <span class="label" data-i18n="toolbar.settings">설정</span></summary>
         <div class="settings-menu">
           <label class="setting-row">
-            <span class="setting-copy"><b>카드에 메모 표시</b><small>내부 메모를 카드 하단에 표시합니다.</small></span>
+            <span class="setting-copy"><b data-i18n="settings.notesTitle">카드에 메모 표시</b><small data-i18n="settings.notesDescription">내부 메모를 카드 하단에 표시합니다.</small></span>
             <input id="toggleNotes" type="checkbox">
             <span class="switch" aria-hidden="true"></span>
           </label>
           <label class="setting-row">
-            <span class="setting-copy"><b>변경 후 자동 정렬</b><small>이동, 그룹 변경, 가져오기 후 보드를 다시 정렬합니다.</small></span>
+            <span class="setting-copy"><b data-i18n="settings.arrangeTitle">변경 후 자동 정렬</b><small data-i18n="settings.arrangeDescription">이동, 그룹 변경, 가져오기 후 보드를 다시 정렬합니다.</small></span>
             <input id="toggleAutoArrange" type="checkbox">
             <span class="switch" aria-hidden="true"></span>
           </label>
+          <div class="language-row">
+            <span class="setting-copy"><b data-i18n="settings.languageTitle">언어</b><small data-i18n="settings.languageDescription">인터페이스 언어를 선택합니다.</small></span>
+            <div class="language-options" role="group" aria-label="인터페이스 언어" data-i18n-aria-label="settings.languageLabel">
+              <button type="button" data-locale="ko" data-i18n="settings.korean">한국어</button>
+              <button type="button" data-locale="en" data-i18n="settings.english">English</button>
+            </div>
+          </div>
         </div>
       </details>
-      <button class="icon-btn" id="arrange" title="카드와 그룹을 읽기 쉽게 정렬" aria-label="카드와 그룹 정렬">⌗ <span class="label">정렬</span></button>
-      <button class="icon-btn" id="undo" title="마지막 이동 또는 그룹 변경 실행 취소" aria-label="실행 취소">↶ <span class="label">Undo</span></button>
-      <button class="icon-btn" id="reset" title="보드 초기화" aria-label="보드 초기화">↺ <span class="label">Reset</span></button>
+      <button class="icon-btn" id="arrange" title="카드와 그룹을 읽기 쉽게 정렬" data-i18n-title="toolbar.arrangeTitle" aria-label="카드와 그룹 정렬" data-i18n-aria-label="toolbar.arrangeLabel">⌗ <span class="label" data-i18n="toolbar.arrange">정렬</span></button>
+      <button class="icon-btn" id="undo" title="마지막 이동 또는 그룹 변경 실행 취소" data-i18n-title="toolbar.undoTitle" aria-label="실행 취소" data-i18n-aria-label="toolbar.undoLabel">↶ <span class="label" data-i18n="toolbar.undo">실행 취소</span></button>
+      <button class="icon-btn" id="reset" title="보드 초기화" data-i18n-title="toolbar.resetTitle" aria-label="보드 초기화" data-i18n-aria-label="toolbar.resetLabel">↺ <span class="label" data-i18n="toolbar.reset">초기화</span></button>
     </div>
   </header>
   <div class="document-scrim" id="documentScrim"></div>
-  <aside class="document-sidebar" id="documentSidebar" aria-hidden="true" aria-label="Document and save states" inert>
+  <aside class="document-sidebar" id="documentSidebar" aria-hidden="true" aria-label="문서 및 저장 상태" data-i18n-aria-label="document.label" inert>
     <div class="document-sidebar-head">
-      <div><small>DOCUMENT</small><h2 id="workspaceTitle">Local workspace</h2></div>
-      <button type="button" id="closeDocument" aria-label="Close document sidebar">×</button>
+      <div><small data-i18n="document.heading">문서</small><h2 id="workspaceTitle">로컬 작업공간</h2></div>
+      <button type="button" id="closeDocument" aria-label="문서 사이드바 닫기" data-i18n-aria-label="document.close">×</button>
     </div>
-    <p class="document-explainer" id="workspaceDescription">Changes stay in this browser.</p>
+    <p class="document-explainer" id="workspaceDescription">변경사항은 이 브라우저에 보관됩니다.</p>
     <label class="nickname-field">
-      <span>Board nickname</span>
-      <input id="boardNickname" type="text" maxlength="60" placeholder="Untitled board" autocomplete="off">
+      <span data-i18n="document.nickname">보드 이름</span>
+      <input id="boardNickname" type="text" maxlength="60" placeholder="제목 없는 보드" data-i18n-placeholder="document.nicknamePlaceholder" autocomplete="off">
     </label>
-    <section class="document-layers" aria-label="Document versions">
-      <h3>Versions</h3>
+    <section class="document-layers" aria-label="문서 버전" data-i18n-aria-label="document.versionsLabel">
+      <h3 data-i18n="document.versions">버전</h3>
       <article class="document-layer local-layer" id="localLayer">
         <span class="layer-icon local" aria-hidden="true">◆</span>
-        <div><b>Local workspace</b><small id="localLayerMeta">Autosaved in this browser</small></div>
-        <button type="button" id="publishCloud" hidden>Publish</button>
+        <div><b data-i18n="document.local">로컬 작업공간</b><small id="localLayerMeta">이 브라우저에 자동 저장됨</small></div>
+        <button type="button" id="publishCloud" data-i18n="document.publish" hidden>게시</button>
       </article>
       <article class="document-layer cloud-layer" id="cloudLayer" hidden>
         <span class="layer-icon cloud" aria-hidden="true">☁</span>
-        <div><b>Cloud version</b><small id="cloudLayerMeta">Not saved yet</small></div>
-        <button type="button" id="viewCloud" hidden>View</button>
+        <div><b data-i18n="document.cloud">클라우드 버전</b><small id="cloudLayerMeta">아직 게시되지 않음</small></div>
+        <button type="button" id="viewCloud" data-i18n="document.view" hidden>보기</button>
       </article>
       <article class="document-layer draft-layer" id="draftLayer" hidden>
         <span class="layer-icon draft" aria-hidden="true">●</span>
-        <div><b>Local draft</b><small id="draftLayerMeta">Cloud is unchanged</small></div>
-        <button type="button" id="openDraft" hidden>Open</button>
+        <div><b data-i18n="document.draft">로컬 초안</b><small id="draftLayerMeta">클라우드 변경 없음</small></div>
+        <button type="button" id="openDraft" data-i18n="document.openDraft" hidden>열기</button>
       </article>
       <div class="layer-actions" id="draftLayerActions" hidden>
-        <button type="button" id="pullCloud">Discard draft</button>
-        <button class="primary" type="button" id="saveCloud">Save to cloud</button>
+        <button type="button" id="pullCloud" data-i18n="document.discardDraft">초안 버리기</button>
+        <button class="primary" type="button" id="saveCloud" data-i18n="document.saveCloud">클라우드에 저장</button>
       </div>
       <article class="document-layer backup-layer" id="backupLayer" hidden>
         <span class="layer-icon backup" aria-hidden="true">↶</span>
-        <div><b>Local backup</b><small id="backupLayerMeta">Last successfully saved draft</small></div>
-        <button type="button" id="restoreBackup">Restore</button>
+        <div><b data-i18n="document.backup">로컬 백업</b><small id="backupLayerMeta">마지막으로 저장된 초안</small></div>
+        <button type="button" id="restoreBackup" data-i18n="document.restore">복원</button>
       </article>
     </section>
     <section class="recent-workspaces" id="recentSection" hidden>
-      <h3>Recent workspaces</h3>
+      <h3 data-i18n="document.recents">최근 작업공간</h3>
       <div id="recentWorkspaces"></div>
     </section>
-    <button class="new-local-button" type="button" id="newLocal">＋ New local workspace</button>
+    <button class="new-local-button" type="button" id="newLocal" data-i18n="document.newLocal">＋ 새 로컬 작업공간</button>
   </aside>
   <dialog class="random-dialog" id="randomDialog">
     <form class="random-form" id="randomForm">
-      <h2>Random grouping</h2>
-      <p>회사 다양성과 그룹 크기 균형을 우선해 참가자를 섞습니다. Corca 멤버는 제외됩니다.</p>
-      <label class="number-field">그룹 수<input id="randomGroupCount" type="number" min="1" step="1" required></label>
+      <h2 data-i18n="random.title">무작위 그룹 만들기</h2>
+      <p data-i18n="random.description">회사 다양성과 그룹 크기 균형을 우선해 참가자를 섞습니다. Corca 멤버는 제외됩니다.</p>
+      <label class="number-field"><span data-i18n="random.groupCount">그룹 수</span><input id="randomGroupCount" type="number" min="1" step="1" required></label>
       <div class="dialog-actions">
-        <button type="button" id="cancelRandom">취소</button>
-        <button class="primary" type="submit">그룹 만들기</button>
+        <button type="button" id="cancelRandom" data-i18n="common.cancel">취소</button>
+        <button class="primary" type="submit" data-i18n="random.create">그룹 만들기</button>
       </div>
     </form>
   </dialog>
   <dialog class="conflict-dialog" id="conflictDialog">
     <form method="dialog" class="conflict-form">
-      <h2>Cloud state changed</h2>
-      <p>Someone saved this board after your local draft began. Choose which state to keep.</p>
+      <h2 data-i18n="conflict.title">클라우드 상태가 변경됨</h2>
+      <p data-i18n="conflict.description">로컬 초안을 만든 뒤 다른 사람이 이 보드를 저장했습니다. 유지할 상태를 선택하세요.</p>
       <div class="conflict-actions">
-        <button value="cancel">Cancel</button>
-        <button value="pull">Load latest cloud</button>
-        <button class="danger" value="overwrite">Overwrite cloud</button>
+        <button value="cancel" data-i18n="common.cancel">취소</button>
+        <button value="pull" data-i18n="conflict.loadLatest">최신 클라우드 불러오기</button>
+        <button class="danger" value="overwrite" data-i18n="conflict.overwrite">클라우드 덮어쓰기</button>
       </div>
     </form>
   </dialog>
-  <section class="stage-wrap" aria-label="참가자 캔버스">
-    <div id="stage"></div>
-    <div class="empty" id="empty"><div><b>검색 결과가 없어요.</b><br>다른 이름이나 주제를 입력해 보세요.</div></div>
-    <div class="hint"><b>끌어서 그룹 만들기</b><span>· 흔들어서 분리 · 우클릭으로 그룹 해제 · 클릭으로 자세히</span></div>
-    <aside class="drawer" id="drawer" aria-hidden="true" aria-label="참가자 상세 정보">
-      <button class="close" id="close" aria-label="상세 정보 닫기">×</button>
+  <section class="stage-wrap" aria-label="참가자 캔버스" data-i18n-aria-label="stage.label">
+    <div id="stage" data-corner-label="드래그해서 그룹 만들기" data-i18n-corner-label="stage.corner"></div>
+    <div class="empty" id="empty"><div><b data-i18n="empty.title">검색 결과가 없어요.</b><br><span data-i18n="empty.description">다른 이름이나 주제를 입력해 보세요.</span></div></div>
+    <div class="hint"><b data-i18n="hint.title">끌어서 그룹 만들기</b><span data-i18n="hint.description">· 흔들어서 분리 · 우클릭으로 그룹 해제 · 클릭으로 자세히</span></div>
+    <aside class="drawer" id="drawer" aria-hidden="true" aria-label="참가자 상세 정보" data-i18n-aria-label="drawer.label">
+      <button class="close" id="close" aria-label="상세 정보 닫기" data-i18n-aria-label="drawer.close">×</button>
       <div id="drawerContent"></div>
     </aside>
     <div class="drawer-scrim" id="scrim"></div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
   </section>
-  <div class="draft-save-bar" id="draftSaveBar" hidden role="region" aria-label="Unsaved cloud changes">
-    <div><b>Local draft</b><span>Your changes are safe in this browser. The cloud version is unchanged.</span></div>
-    <button type="button" id="discardDraftBar">Discard</button>
-    <button class="primary" type="button" id="saveCloudBar">Save to cloud</button>
+  <div class="draft-save-bar" id="draftSaveBar" hidden role="region" aria-label="저장되지 않은 클라우드 변경사항" data-i18n-aria-label="saveBar.label">
+    <div><b data-i18n="saveBar.title">로컬 초안</b><span data-i18n="saveBar.description">변경사항은 이 브라우저에 안전하게 보관됩니다. 클라우드 버전은 변경되지 않았습니다.</span></div>
+    <button type="button" id="discardDraftBar" data-i18n="saveBar.discard">버리기</button>
+    <button class="primary" type="button" id="saveCloudBar" data-i18n="saveBar.save">클라우드에 저장</button>
   </div>
 </main>

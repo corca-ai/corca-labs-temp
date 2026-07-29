@@ -1,3 +1,5 @@
+import { getLocale, t } from "./i18n";
+
 const people = [
   {id:"seulmin",name:"Seulmin Park",company:"교원",role:"경영관리팀 및 AI TF · 사내 활용 확산, 정책 수립, 과제 발굴 및 PoC 기획",topic:"자동화 에이전트",want:"그룹사별 매출·영업이익 데이터의 수집, 엑셀 가공, 실적 분석, 대시보드 생성, AI 인사이트 제시까지 전 과정을 연결한 자동화 에이전트.",why:"현재 수작업으로 처리하는 업무 공수를 줄이고 정확도를 높이기 위해서다. 사람이 놓친 패턴까지 AI가 찾아내는 경영실적 대시보드를 기대한다.",data:"기간별 매출과 영업이익 XLSX · 약 200행",quick:["표준화가 안 된 데이터","AI가 다 대체할 수 있다는 것","업무 프로세스와 병목을 정확히 아는 사람"],color:"#e95c3f"},
   {id:"yoonji",name:"이윤지B",company:"데이원컴퍼니",role:"AX팀 · 사내 AX 과제 발굴·구현·정착 및 외부 AX 교육·컨설팅 프로그램 설계",topic:"AX 문제 정의 프레임",want:"모호한 현업 요청을 구체적인 AX 문제로 정의하고 근본 원인을 찾는 실무자의 암묵적 판단 기준을 재사용 가능한 프레임으로 구조화한다.",why:"문제 정의 역량이 일부 경험자의 감각에 머물지 않고 다른 구성원도 배우고 적용할 수 있는 형태가 되길 바란다. 풀스택 FDE의 가능성과 협업의 경계를 함께 탐색한다.",data:"교안 검수 플러그인 방향 전환 사례 · Markdown 1건",quick:["판단 기준을 스스로도 명확히 설명하기 어려움","AI가 일을 통째로 대신할 수 있다는 것","될 때까지 계속 묻고 고쳐보는 사람"],color:"#6c62c9"},
@@ -117,8 +119,9 @@ function applyAutoArrangeSetting(){
 function updateCardNote(id){
   const noteEl=document.querySelector(`[data-id="${id}"] .card-note`);
   if(!noteEl)return;
-  const value=state.notes[id]?.trim()||"메모 없음";
+  const value=state.notes[id]?.trim()||t("card.noNotes");
   noteEl.classList.toggle("note-empty",!state.notes[id]?.trim());
+  noteEl.querySelector("b").textContent=t("card.notes");
   noteEl.querySelector("span").textContent=value;
 }
 function render(){
@@ -131,8 +134,8 @@ function render(){
     const group=state.groups[p.id],groupColor=group?state.groupColors[group]:"";
     const el=document.createElement("article"); el.className=`person${p.special?" corca":""}${group?" grouped":""}`; el.dataset.id=p.id; el.tabIndex=0;
     el.style.cssText=`--card-color:${p.color};--group-color:${groupColor};transform:translate(${state.positions[p.id].x}px,${state.positions[p.id].y}px)`;
-    el.setAttribute("aria-label",`${p.name}, ${p.company}. 자세히 보기`);
-    el.innerHTML=`<div class="eyebrow"><i class="dot"></i>${p.company}</div><h2>${p.name}</h2><div class="role">${p.role}</div><div class="topic"><span>↗</span>${p.topic}</div>${p.special?"":'<div class="card-note"><b>Internal notes</b><span></span></div>'}`;
+    el.setAttribute("aria-label",t("card.details",{name:p.name,company:p.company}));
+    el.innerHTML=`<div class="eyebrow"><i class="dot"></i>${p.company}</div><h2>${p.name}</h2><div class="role">${p.role}</div><div class="topic"><span>↗</span>${p.topic}</div>${p.special?"":`<div class="card-note"><b>${t("card.notes")}</b><span></span></div>`}`;
     el.addEventListener("click",()=>{if(!state.moved)openDrawer(p.id)});
     el.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openDrawer(p.id)}});
     el.addEventListener("contextmenu",e=>{e.preventDefault();ungroup(p.id)});
@@ -160,20 +163,20 @@ function updateHulls(){
     const hull=document.createElement("div");hull.className="group-hull";
     hull.style.cssText=`--group-color:${state.groupColors[g]||groupPalette[0]};left:${minX}px;top:${minY}px;width:${maxX-minX}px;height:${maxY-minY}px`;
     const button=document.createElement("button");
-    button.type="button";button.textContent=state.groupLabels[g]||`cluster · ${ids.length}`;
-    button.title="클릭해서 그룹 이름 지정";button.setAttribute("aria-label",`${button.textContent} 그룹 이름 변경`);
+    button.type="button";button.textContent=state.groupLabels[g]||t("group.fallback",{count:ids.length});
+    button.title=t("group.editTitle");button.setAttribute("aria-label",t("group.editLabel",{name:button.textContent}));
     button.addEventListener("click",()=>editGroupLabel(g));
     hull.appendChild(button);stage.prepend(hull);
   });
 }
 function editGroupLabel(g){
   const current=state.groupLabels[g]||"";
-  const next=prompt("그룹 이름을 입력하세요. 비워두면 기본 이름으로 돌아갑니다.",current);
+  const next=prompt(t("group.prompt"),current);
   if(next===null)return;
   pushHistory(snapshot());
   const clean=next.trim().slice(0,40);
   if(clean)state.groupLabels[g]=clean;else{delete state.groupLabels[g];ensureGroupLabels()}
-  settleLayoutChange(clean?"그룹 이름을 저장했어요":"자동 그룹 이름을 지정했어요",updateHulls);
+  settleLayoutChange(clean?t("toast.groupLabelSaved"):t("toast.groupLabelDefault"),updateHulls);
 }
 function group(a,b){
   pushHistory(state.dragStart||snapshot());
@@ -185,13 +188,13 @@ function group(a,b){
     delete state.groupColors[gb];
   }
   state.groups[a]=g;state.groups[b]=g;ensureGroupLabels();
-  settleLayoutChange("그룹을 만들었어요",()=>{updateGroupCardStyles();updateHulls()});
+  settleLayoutChange(t("toast.groupCreated"),()=>{updateGroupCardStyles();updateHulls()});
 }
 function ungroup(id){
-  const g=state.groups[id];if(!g){showToast("이 카드는 그룹에 속해 있지 않아요");return}
+  const g=state.groups[id];if(!g){showToast(t("toast.notGrouped"));return}
   pushHistory(snapshot());delete state.groups[id];
   if(groupMembers(g).length<2){Object.keys(state.groups).forEach(k=>{if(state.groups[k]===g)delete state.groups[k]});delete state.groupLabels[g];delete state.groupColors[g]}
-  settleLayoutChange("그룹에서 분리했어요",()=>{updateGroupCardStyles();updateHulls()});
+  settleLayoutChange(t("toast.ungrouped"),()=>{updateGroupCardStyles();updateHulls()});
 }
 function shakeToUngroup(id){
   const g=state.groups[id];if(!g)return false;
@@ -199,7 +202,7 @@ function shakeToUngroup(id){
   if(groupMembers(g).length<2){Object.keys(state.groups).forEach(k=>{if(state.groups[k]===g)delete state.groups[k]});delete state.groupLabels[g];delete state.groupColors[g]}
   state.shake.broken=true;updateGroupCardStyles();updateHulls();
   if(navigator.vibrate)navigator.vibrate(35);
-  showToast("흔들어서 그룹에서 분리했어요");
+  showToast(t("toast.shakeUngrouped"));
   return true;
 }
 function shuffled(items){
@@ -236,10 +239,10 @@ function randomizeGroups(groupCount){
     bucket.forEach(p=>state.groups[p.id]=groupId);
   });
   ensureGroupLabels();save();
-  arrangeBoard({record:false,message:`회사 다양성을 고려해 ${groupCount}개 그룹을 만들었어요`});
+  arrangeBoard({record:false,message:t("toast.randomized",{count:groupCount})});
 }
 function arrangeBoard(options={}){
-  const {record=true,silent=false,message="클러스터 안에서 Corca 배지를 오른쪽으로 정렬했어요"}=options;
+  const {record=true,silent=false,message=t("toast.arranged")}=options;
   if(record)pushHistory(snapshot());
   const groupedIds=new Set(Object.keys(state.groups));
   const groupedUnits=[...new Set(Object.values(state.groups))]
@@ -313,7 +316,7 @@ function arrangeBoard(options={}){
 }
 function settleLayoutChange(message,update=render){
   if(state.autoArrange){
-    arrangeBoard({record:false,message:`${message.replace(/요$/,"")}고 자동 정렬했어요`});
+    arrangeBoard({record:false,message:t("toast.autoArranged")});
     return;
   }
   save();update();showToast(message);
@@ -322,28 +325,28 @@ function markdownText(value){
   return String(value||"").replace(/([\\`*_[\]<>])/g,"\\$1").replace(/\n+/g," ");
 }
 function exportMarkdown(){
-  const lines=[`# ${markdownText(state.nickname)||"Open AX Day · People Canvas"}`,"","현재 캔버스의 그룹 구성입니다.",""];
+  const lines=[`# ${markdownText(state.nickname)||"Open AX Day · People Canvas"}`,"",t("export.description"),""];
   const groupIds=[...new Set(Object.values(state.groups))];
   groupIds.forEach((g,index)=>{
     const ids=groupMembers(g);
     if(ids.length<2)return;
-    lines.push(`## ${markdownText(state.groupLabels[g]||`클러스터 ${index+1}`)}`,"");
+    lines.push(`## ${markdownText(state.groupLabels[g]||t("export.cluster",{index:index+1}))}`,"");
     ids.forEach(id=>{
       const p=people.find(person=>person.id===id);
       lines.push(`- **${markdownText(p.name)}** — ${markdownText(p.company)}`);
-      lines.push(`  - ${markdownText(p.special?"Open AX Day host":p.topic)}`);
-      if(!p.special&&state.notes[p.id]?.trim())lines.push(`  - **내부 메모:** ${markdownText(state.notes[p.id])}`);
+      lines.push(`  - ${markdownText(p.special?t("export.host"):p.topic)}`);
+      if(!p.special&&state.notes[p.id]?.trim())lines.push(`  - **${t("export.notes")}:** ${markdownText(state.notes[p.id])}`);
     });
     lines.push("");
   });
   const groupedIds=new Set(Object.keys(state.groups));
   const ungrouped=people.filter(p=>!groupedIds.has(p.id));
   if(ungrouped.length){
-    lines.push("## 그룹 없음","");
+    lines.push(`## ${t("export.ungrouped")}`,"");
     ungrouped.forEach(p=>{
       lines.push(`- **${markdownText(p.name)}** — ${markdownText(p.company)}`);
-      lines.push(`  - ${markdownText(p.special?"Open AX Day host":p.topic)}`);
-      if(!p.special&&state.notes[p.id]?.trim())lines.push(`  - **내부 메모:** ${markdownText(state.notes[p.id])}`);
+      lines.push(`  - ${markdownText(p.special?t("export.host"):p.topic)}`);
+      if(!p.special&&state.notes[p.id]?.trim())lines.push(`  - **${t("export.notes")}:** ${markdownText(state.notes[p.id])}`);
     });
     lines.push("");
   }
@@ -351,7 +354,7 @@ function exportMarkdown(){
   const url=URL.createObjectURL(blob),link=document.createElement("a");
   link.href=url;link.download="open-ax-day-groups.md";document.body.appendChild(link);link.click();link.remove();
   setTimeout(()=>URL.revokeObjectURL(url),1000);
-  showToast("Markdown 파일을 내보냈어요");
+  showToast(t("toast.markdownExported"));
 }
 function downloadFile(name,text,type){
   const blob=new Blob([text],{type}),url=URL.createObjectURL(blob),link=document.createElement("a");
@@ -366,7 +369,7 @@ function exportJson(){
     board:{positions:state.positions,groups:state.groups,groupLabels:state.groupLabels,groupColors:state.groupColors,notes:state.notes,nickname:state.nickname,showNotes:state.showNotes,autoArrange:state.autoArrange}
   };
   downloadFile("open-ax-day-board.json",JSON.stringify(payload,null,2),"application/json;charset=utf-8");
-  showToast("JSON 파일을 내보냈어요");
+  showToast(t("toast.jsonExported"));
 }
 async function importJsonFile(file){
   try{
@@ -404,22 +407,22 @@ async function importJsonFile(file){
     pushHistory(snapshot());state.positions=positions;state.groups=groups;state.groupLabels=groupLabels;state.groupColors=groupColors;state.notes=notes;state.nickname=typeof payload.board.nickname==="string"?payload.board.nickname.slice(0,60):"";state.showNotes=Boolean(payload.board.showNotes);state.autoArrange=Boolean(payload.board.autoArrange);
     ensureGroupLabels();
     applyNotesVisibility();applyAutoArrangeSetting();
-    settleLayoutChange("JSON에서 보드 상태와 메모를 가져왔어요");
+    settleLayoutChange(t("toast.jsonImported"));
   }catch(error){
-    showToast("올바른 People Canvas JSON 파일이 아니에요");
+    showToast(t("toast.invalidJson"));
   }
 }
-function openDrawer(id){
+function openDrawer(id,focusClose=true){
   const p=people.find(x=>x.id===id);state.selected=id;
   content.innerHTML=p.special
-  ? `<div class="drawer-company">Corca · Open AX Day</div><h2>${p.name}</h2><p class="drawer-role">Corca team</p>
-  <section><h3>Workshop role</h3><h4>Open AX Day host</h4><p>참가자들과 함께 워크숍을 만드는 Corca 멤버입니다.</p></section>`
+  ? `<div class="drawer-company">Corca · Open AX Day</div><h2>${p.name}</h2><p class="drawer-role">${t("drawer.team")}</p>
+  <section><h3>${t("drawer.workshopRole")}</h3><h4>${t("drawer.host")}</h4><p>${t("drawer.hostDescription")}</p></section>`
   : `<div class="drawer-company">${p.company}</div><h2>${p.name}</h2><p class="drawer-role">${p.role}</p>
-  <section><h3>Workshop build</h3><h4>${p.topic}</h4><p>${p.want}</p></section>
-  <section><h3>Why this matters</h3><p>${p.why}</p></section>
-  <section><h3>Sample data</h3><p>${p.data}</p></section>
-  <section><h3>Quick responses</h3><div class="quick"><div><b>AI 도입의 장애물</b><span>${p.quick[0]}</span></div><div><b>주변의 오해</b><span>${p.quick[1]}</span></div><div><b>AI를 잘 활용하는 사람</b><span>${p.quick[2]}</span></div></div></section>
-  <section><h3>Internal notes</h3><textarea class="notes-field" id="personNotes" placeholder="이 참가자에 대한 내부 메모를 남기세요…"></textarea><p class="notes-help">입력하는 즉시 이 브라우저에 자동 저장됩니다.</p></section>`;
+  <section><h3>${t("drawer.workshopBuild")}</h3><h4>${p.topic}</h4><p>${p.want}</p></section>
+  <section><h3>${t("drawer.why")}</h3><p>${p.why}</p></section>
+  <section><h3>${t("drawer.sampleData")}</h3><p>${p.data}</p></section>
+  <section><h3>${t("drawer.quickResponses")}</h3><div class="quick"><div><b>${t("drawer.obstacle")}</b><span>${p.quick[0]}</span></div><div><b>${t("drawer.misconception")}</b><span>${p.quick[1]}</span></div><div><b>${t("drawer.goodUser")}</b><span>${p.quick[2]}</span></div></div></section>
+  <section><h3>${t("drawer.notes")}</h3><textarea class="notes-field" id="personNotes" placeholder="${t("drawer.notesPlaceholder")}"></textarea><p class="notes-help">${t("drawer.notesHelp")}</p></section>`;
   if(!p.special){
     const field=document.querySelector("#personNotes");
     field.value=state.notes[p.id]||"";
@@ -433,16 +436,21 @@ function openDrawer(id){
       }
     });
   }
-  drawer.classList.add("open");drawer.setAttribute("aria-hidden","false");document.querySelector("#close").focus({preventScroll:true});
+  drawer.classList.add("open");drawer.setAttribute("aria-hidden","false");if(focusClose)document.querySelector("#close").focus({preventScroll:true});
 }
 function closeDrawer(){drawer.classList.remove("open");drawer.setAttribute("aria-hidden","true");const el=document.querySelector(`[data-id="${state.selected}"]`);if(el)setTimeout(()=>el.focus(),250)}
 function filter(){
-  const q=search.value.trim().toLocaleLowerCase("ko");let visible=0;
-  people.forEach(p=>{const hit=!q||Object.values(p).join(" ").toLocaleLowerCase("ko").includes(q);document.querySelector(`[data-id="${p.id}"]`)?.classList.toggle("match-dim",!hit);if(hit)visible++});
-  document.querySelector("#count").textContent=`${visible} ${visible===1?"person":"people"}`;empty.classList.toggle("show",visible===0);
+  const locale=getLocale()==="ko"?"ko-KR":"en-US";
+  const q=search.value.trim().toLocaleLowerCase(locale);let visible=0;
+  people.forEach(p=>{const hit=!q||Object.values(p).join(" ").toLocaleLowerCase(locale).includes(q);document.querySelector(`[data-id="${p.id}"]`)?.classList.toggle("match-dim",!hit);if(hit)visible++});
+  document.querySelector("#count").textContent=t("count.people",{count:visible});empty.classList.toggle("show",visible===0);
 }
 let toastTimer;function showToast(msg){toast.textContent=msg;toast.classList.add("show");clearTimeout(toastTimer);toastTimer=setTimeout(()=>toast.classList.remove("show"),1800)}
 addEventListener("board:toast",e=>showToast(String(e.detail||"")));
+addEventListener("board:locale-changed",()=>{
+  render();
+  if(drawer.classList.contains("open")&&state.selected)openDrawer(state.selected,false);
+});
 addEventListener("board:set-nickname",e=>{
   const nickname=String(e.detail||"").slice(0,60);
   if(state.nickname===nickname)return;
@@ -486,7 +494,7 @@ interact(".person").draggable({
       const r=e.target.getBoundingClientRect(),target=[...document.elementsFromPoint(r.left+r.width/2,r.top+r.height/2)].find(el=>el.classList?.contains("person")&&el!==e.target);
       const detachedByShake=state.shake?.broken;
       if(target&&!detachedByShake)group(e.target.dataset.id,target.dataset.id);
-      else if(state.moved){pushHistory(state.dragStart);settleLayoutChange(detachedByShake?"그룹에서 분리했어요":"카드를 이동했어요")}
+      else if(state.moved){pushHistory(state.dragStart);settleLayoutChange(detachedByShake?t("toast.ungrouped"):t("toast.cardMoved"))}
       state.shake=null;
       setTimeout(()=>state.moved=false,0);
     }
@@ -514,16 +522,16 @@ document.querySelector("#randomForm").addEventListener("submit",e=>{
 });
 document.querySelector("#toggleNotes").addEventListener("change",e=>{
   state.showNotes=e.target.checked;applyNotesVisibility();
-  arrangeBoard({record:false,message:state.showNotes?"카드에 내부 메모를 표시했어요":"카드의 내부 메모를 숨겼어요"});
+  arrangeBoard({record:false,message:state.showNotes?t("toast.notesShown"):t("toast.notesHidden")});
 });
 document.querySelector("#toggleAutoArrange").addEventListener("change",e=>{
   state.autoArrange=e.target.checked;
-  if(state.autoArrange)arrangeBoard({record:false,message:"변경 후 자동 정렬을 켰어요"});
-  else{save();showToast("변경 후 자동 정렬을 껐어요")}
+  if(state.autoArrange)arrangeBoard({record:false,message:t("toast.autoArrangeOn")});
+  else{save();showToast(t("toast.autoArrangeOff"))}
 });
 document.querySelector("#arrange").addEventListener("click",arrangeBoard);
-document.querySelector("#undo").addEventListener("click",()=>{const s=state.history.pop();if(!s)return showToast("되돌릴 변경이 없어요");const prev=JSON.parse(s);state.positions=prev.positions;state.groups=prev.groups;state.groupLabels=prev.groupLabels||{};state.groupColors=prev.groupColors||{};ensureGroupLabels();settleLayoutChange("마지막 변경을 되돌렸어요")});
-document.querySelector("#reset").addEventListener("click",()=>{pushHistory(snapshot());state.groups={};state.groupLabels={};state.groupColors={};initialPositions();settleLayoutChange("보드를 초기화했어요")});
+document.querySelector("#undo").addEventListener("click",()=>{const s=state.history.pop();if(!s)return showToast(t("toast.nothingToUndo"));const prev=JSON.parse(s);state.positions=prev.positions;state.groups=prev.groups;state.groupLabels=prev.groupLabels||{};state.groupColors=prev.groupColors||{};ensureGroupLabels();settleLayoutChange(t("toast.undone"))});
+document.querySelector("#reset").addEventListener("click",()=>{pushHistory(snapshot());state.groups={};state.groupLabels={};state.groupColors={};initialPositions();settleLayoutChange(t("toast.reset"))});
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDrawer();if(e.key==="/"&&document.activeElement!==search){e.preventDefault();search.focus()}if((e.metaKey||e.ctrlKey)&&e.key==="z"){e.preventDefault();document.querySelector("#undo").click()}});
 addEventListener("resize",()=>{clearTimeout(window.resizeTimer);window.resizeTimer=setTimeout(()=>{Object.keys(state.positions).forEach(id=>state.positions[id]=clampPos(state.positions[id],id));render();save()},180)});
 const restored=load();

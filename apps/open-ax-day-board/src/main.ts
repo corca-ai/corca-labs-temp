@@ -3,6 +3,7 @@ import autoStart from "@interactjs/auto-start/plugin.js";
 import inertia from "@interactjs/inertia/plugin.js";
 import interact from "@interactjs/interact/index.js";
 import interactModifiers from "@interactjs/modifiers/all.js";
+import { applyTranslations, getLocale, setLocale, t, type Locale } from "./i18n";
 import modifiersPlugin from "@interactjs/modifiers/plugin.js";
 import template from "./template.html?raw";
 import "./board.css";
@@ -217,7 +218,7 @@ class WorkspaceController {
   private bindUi(): void {
     const saveDraft = () => void this.saveDraftToCloud(false);
     const discardDraft = () => {
-      if (confirm("Discard this local draft and load the latest cloud state?")) {
+      if (confirm(t("confirm.discardDraft"))) {
         void this.loadLatestCloud();
       }
     };
@@ -328,7 +329,7 @@ class WorkspaceController {
       replaceWorkspaceUrl("cloud", this.id);
       this.remember();
       this.render();
-      emitToast("Saved the local draft to cloud");
+      emitToast(t("toast.savedCloud"));
     } catch (error) {
       if (error instanceof CloudConflictError) {
         this.conflictCurrent = error.current;
@@ -339,7 +340,7 @@ class WorkspaceController {
       }
       this.status = "offline";
       this.render();
-      emitToast("Cloud save failed; your local draft is safe");
+      emitToast(t("toast.saveFailed"));
     }
   }
 
@@ -359,7 +360,7 @@ class WorkspaceController {
     } catch {
       this.status = "offline";
       this.render();
-      emitToast("Could not load the latest cloud state");
+      emitToast(t("toast.loadFailed"));
     }
   }
 
@@ -367,7 +368,7 @@ class WorkspaceController {
     if (this.mode === "local") return;
     const backup = this.local.loadBackup(this.id);
     if (!backup) return;
-    if (this.local.loadDraft(this.id) && !confirm("Replace the current local draft with the backup?")) {
+    if (this.local.loadDraft(this.id) && !confirm(t("confirm.replaceDraft"))) {
       return;
     }
     this.local.saveDraft(this.id, {
@@ -402,7 +403,7 @@ class WorkspaceController {
     } catch {
       this.status = "local";
       this.render();
-      emitToast("Publish failed; this workspace remains local");
+      emitToast(t("toast.publishFailed"));
     }
   }
 
@@ -424,11 +425,11 @@ class WorkspaceController {
     if (!status || !title || !description || !documentTitle || !documentKicker) return;
 
     const labels: Record<PersistenceStatus, string> = {
-      cloud: "Cloud",
-      draft: "Local draft",
-      local: "Local only",
-      saving: "Saving…",
-      offline: "Offline",
+      cloud: t("status.cloud"),
+      draft: t("status.draft"),
+      local: t("status.local"),
+      saving: t("status.saving"),
+      offline: t("status.offline"),
     };
     status.dataset.status = this.status;
     status.textContent = labels[this.status];
@@ -438,22 +439,22 @@ class WorkspaceController {
     const storedDraft = this.local.loadDraft(this.id);
     const backup = this.local.loadBackup(this.id);
     const boardNickname = nicknameOf(this.currentState);
-    documentTitle.textContent = boardNickname || "Untitled board";
+    documentTitle.textContent = boardNickname || t("document.untitled");
     documentKicker.textContent = isLocal
-      ? "Local workspace"
+      ? t("document.kicker.local")
       : isDraft
-        ? "Cloud board · editing local draft"
-        : "Cloud board";
+        ? t("document.kicker.draft")
+        : t("document.kicker.cloud");
     title.textContent = isLocal
-      ? "Local workspace"
+      ? t("document.title.local")
       : isDraft
-        ? "Local draft of cloud"
-        : "Cloud state";
+        ? t("document.title.draft")
+        : t("document.title.cloud");
     description.textContent = isLocal
-      ? "Changes stay in this browser until you publish."
+      ? t("document.description.local")
       : isDraft
-        ? "Autosaved here. The cloud board is unchanged."
-        : "Latest cloud state. Your next change creates a local draft.";
+        ? t("document.description.draft")
+        : t("document.description.cloud");
 
     const nickname = document.querySelector<HTMLInputElement>("#boardNickname");
     if (nickname && document.activeElement !== nickname) {
@@ -485,17 +486,24 @@ class WorkspaceController {
     const draftMeta = document.querySelector<HTMLElement>("#draftLayerMeta");
     const backupMeta = document.querySelector<HTMLElement>("#backupLayerMeta");
     const localMeta = document.querySelector<HTMLElement>("#localLayerMeta");
-    if (localMeta) localMeta.textContent = "Autosaved in this browser";
+    if (localMeta) localMeta.textContent = t("document.meta.local");
     if (cloudMeta) {
       cloudMeta.textContent = this.cloudBoard
-        ? `Revision ${this.cloudBoard.revision} · ${this.formatTimestamp(this.cloudBoard.updatedAt)}`
-        : "Not published yet";
+        ? t("document.meta.cloud", {
+            revision: this.cloudBoard.revision,
+            time: this.formatTimestamp(this.cloudBoard.updatedAt),
+          })
+        : t("document.meta.cloudEmpty");
     }
     if (draftMeta && storedDraft) {
-      draftMeta.textContent = `Autosaved ${this.formatTimestamp(storedDraft.savedAt)} · cloud unchanged`;
+      draftMeta.textContent = t("document.meta.draft", {
+        time: this.formatTimestamp(storedDraft.savedAt),
+      });
     }
     if (backupMeta && backup) {
-      backupMeta.textContent = `Saved ${this.formatTimestamp(backup.savedAt)}`;
+      backupMeta.textContent = t("document.meta.backup", {
+        time: this.formatTimestamp(backup.savedAt),
+      });
     }
 
     const saving = this.status === "saving";
@@ -508,8 +516,8 @@ class WorkspaceController {
 
   private formatTimestamp(value: string): string {
     const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "time unknown";
-    return date.toLocaleString([], {
+    if (Number.isNaN(date.getTime())) return t("document.timeUnknown");
+    return date.toLocaleString(getLocale() === "ko" ? "ko-KR" : "en-US", {
       month: "short",
       day: "numeric",
       hour: "2-digit",
@@ -533,9 +541,9 @@ class WorkspaceController {
         url.searchParams.set(item.kind === "local" ? "local" : "board", item.id);
         link.href = url.toString();
         const label = document.createElement("span");
-        label.textContent = item.nickname || "Untitled board";
+        label.textContent = item.nickname || t("document.untitled");
         const kind = document.createElement("small");
-        kind.textContent = item.kind;
+        kind.textContent = t(`document.recent.${item.kind}`);
         link.append(label, kind);
         return link;
       }),
@@ -550,12 +558,17 @@ class WorkspaceController {
   get workspaceId(): string {
     return this.id;
   }
+
+  refreshLocale(): void {
+    this.render();
+  }
 }
 
 async function boot(): Promise<void> {
   const app = document.querySelector<HTMLElement>("#app");
   if (!app) throw new Error("Missing app root");
   app.innerHTML = template;
+  applyTranslations(app);
 
   const location = resolveWorkspaceLocation();
   const apiUrl = import.meta.env.VITE_BOARD_API_URL?.trim();
@@ -578,13 +591,33 @@ async function boot(): Promise<void> {
   };
 
   await import("./board.js");
+
+  const updateLocaleControls = () => {
+    document.querySelectorAll<HTMLButtonElement>("[data-locale]").forEach((button) => {
+      const active = button.dataset.locale === getLocale();
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-pressed", String(active));
+    });
+  };
+  updateLocaleControls();
+  document.querySelectorAll<HTMLButtonElement>("[data-locale]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const locale = button.dataset.locale as Locale;
+      if (locale !== "ko" && locale !== "en") return;
+      setLocale(locale);
+      applyTranslations(app);
+      controller.refreshLocale();
+      updateLocaleControls();
+      window.dispatchEvent(new CustomEvent("board:locale-changed", { detail: locale }));
+    });
+  });
 }
 
 void boot().catch((error: unknown) => {
   console.error("Board startup failed", error);
   const app = document.querySelector<HTMLElement>("#app");
   if (app) {
-    app.innerHTML = `<main class="boot-failure"><h1>The board could not start.</h1><p>Your other Corca Labs apps are unaffected. Reload this page to try again.</p><button type="button">Reload</button></main>`;
+    app.innerHTML = `<main class="boot-failure"><h1>${t("boot.title")}</h1><p>${t("boot.description")}</p><button type="button">${t("boot.reload")}</button></main>`;
     app.querySelector("button")?.addEventListener("click", () => location.reload());
   }
 });
