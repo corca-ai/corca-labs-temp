@@ -111,8 +111,11 @@
   }
 
   .viewer-panel {
+    height: calc(100dvh - var(--toolbar-height));
+    min-height: 0;
     grid-template-rows: auto 1fr;
     background: var(--color-preview);
+    overflow: hidden;
   }
 
   html[data-view-mode="viewer"] .workspace {
@@ -153,9 +156,10 @@
 
   .preview-stage {
     position: relative;
-    min-height: 430px;
+    min-height: 0;
     padding: clamp(18px, 3vw, 42px);
     overflow: auto;
+    overscroll-behavior: contain;
   }
 }
 
@@ -349,9 +353,10 @@
   }
 
   .mermaid-diagram {
-    width: 100%;
+    width: max-content;
+    min-width: 100%;
     margin: 1.5em 0;
-    overflow: hidden;
+    overflow: visible;
     background:
       linear-gradient(#eef1ee 1px, transparent 1px),
       linear-gradient(90deg, #eef1ee 1px, transparent 1px),
@@ -363,13 +368,10 @@
 
   .mermaid-viewport {
     position: relative;
-    height: max(
-      520px,
-      calc(
-        100dvh - var(--toolbar-height) - 58px - clamp(36px, 6vw, 84px)
-      )
-    );
-    overflow: hidden;
+    width: max-content;
+    min-width: 100%;
+    padding: 48px;
+    overflow: visible;
     cursor: grab;
     outline: none;
     touch-action: none;
@@ -381,11 +383,8 @@
   }
 
   .mermaid-canvas {
-    position: absolute;
-    top: 0;
-    left: 0;
-    transform-origin: 0 0;
-    will-change: transform;
+    position: static;
+    margin: 0 auto;
   }
 
   .mermaid-canvas svg {
@@ -397,12 +396,14 @@
   }
 
   .diagram-controls {
-    position: absolute;
+    position: sticky;
     z-index: 3;
     top: 10px;
-    right: 10px;
+    left: 10px;
     display: flex;
+    width: max-content;
     align-items: center;
+    margin-bottom: -34px;
     overflow: hidden;
     background: rgb(255 255 255 / 94%);
     border: 1px solid #cbd2cd;
@@ -455,6 +456,8 @@
   }
 
   .mermaid-diagram.is-exporting {
+    width: 100%;
+    min-width: 0;
     overflow: visible;
     background: transparent;
     border: 0;
@@ -462,7 +465,10 @@
   }
 
   .mermaid-diagram.is-exporting .mermaid-viewport {
+    width: 100%;
+    min-width: 0;
     height: auto;
+    padding: 12px 0;
     overflow: visible;
   }
 
@@ -714,12 +720,12 @@
     }
 
     .preview-stage {
-      min-height: 56vh;
+      min-height: 0;
     }
 
-    .mermaid-viewport {
-      height: min(70svh, 640px);
-      min-height: 420px;
+    .viewer-panel {
+      height: max(560px, 80svh);
+      overflow: hidden;
     }
   }
 }
@@ -749,7 +755,9 @@
     .markdown-preview {
       display: block !important;
       width: 100%;
+      height: auto;
       min-height: 0;
+      max-height: none;
       margin: 0;
       padding: 0;
       overflow: visible;
@@ -781,6 +789,8 @@
     }
 
     .mermaid-diagram {
+      width: 100%;
+      min-width: 0;
       overflow: visible;
       background: transparent;
       border: 0;
@@ -788,15 +798,20 @@
     }
 
     .mermaid-viewport {
+      width: 100%;
+      min-width: 0;
       height: auto;
+      padding: 0;
       overflow: visible;
     }
 
     .mermaid-canvas {
       position: static;
       display: grid;
-      width: 100% !important;
+      width: var(--diagram-natural-width) !important;
+      max-width: 100%;
       height: auto !important;
+      aspect-ratio: var(--diagram-aspect-ratio);
       transform: none !important;
       place-items: center;
     }

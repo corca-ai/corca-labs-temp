@@ -32,7 +32,7 @@ const VIEW_MODE_STORAGE_KEY = "workflow-viewer:view-mode";
 const MIN_DIAGRAM_SCALE = 0.1;
 const MAX_DIAGRAM_SCALE = 4;
 const DIAGRAM_ZOOM_STEP = 1.2;
-const DIAGRAM_FIT_PADDING = 48;
+const DIAGRAM_FIT_PADDING = 96;
 const DEFAULT_CODE = `# 문의 처리 흐름
 
 \`\`\`mermaid
@@ -112,7 +112,7 @@ const COPY = {
     diagramZoomIn: "확대",
     diagramZoomOut: "축소",
     diagramFit: "화면에 맞춤",
-    diagramHelp: "휠로 확대/축소 · 드래그로 이동",
+    diagramHelp: "Ctrl/⌘ + 휠로 확대/축소 · 드래그로 이동",
   },
   en: {
     title: "Workflow viewer",
@@ -168,7 +168,7 @@ const COPY = {
     diagramZoomIn: "Zoom in",
     diagramZoomOut: "Zoom out",
     diagramFit: "Fit to view",
-    diagramHelp: "Scroll to zoom · drag to pan",
+    diagramHelp: "Ctrl/⌘ + wheel to zoom · drag to pan",
   },
 };
 
@@ -219,6 +219,7 @@ const dropNote = get.element("#drop-note");
 const filenameElement = get.element("#filename");
 const statusElement = get.element("#status");
 const preview = get.element("#preview");
+const previewStage = get.element(".preview-stage");
 const errorPanel = get.element("#error-panel");
 const errorLabel = get.element("#error-label");
 const errorTitle = get.element("#error-title");
@@ -283,20 +284,17 @@ let copyPngResetTimer;
 let pngResetTimer;
 /**
  * @typedef {{
- *   viewport: HTMLElement,
  *   canvas: HTMLElement,
  *   zoomLevel: HTMLElement,
  *   naturalWidth: number,
  *   naturalHeight: number,
  *   scale: number,
- *   x: number,
- *   y: number,
  *   fitted: boolean,
  *   pointerId?: number,
  *   pointerStartX: number,
  *   pointerStartY: number,
- *   originX: number,
- *   originY: number,
+ *   scrollStartLeft: number,
+ *   scrollStartTop: number,
  *   moved: boolean,
  *   suppressClick: boolean,
  *   resizeObserver: ResizeObserver,
@@ -661,45 +659,54 @@ function clampDiagramScale(value) {
 }
 
 /** @param {DiagramViewportState} state */
-function renderDiagramTransform(state) {
-  state.canvas.style.transform =
-    `translate(${state.x}px, ${state.y}px) scale(${state.scale})`;
+function renderDiagramScale(state) {
+  state.canvas.style.width = `${state.naturalWidth * state.scale}px`;
+  state.canvas.style.height = `${state.naturalHeight * state.scale}px`;
   state.zoomLevel.textContent = `${Math.round(state.scale * 100)}%`;
 }
 
 /** @param {DiagramViewportState} state */
 function fitDiagramToViewport(state) {
-  const width = state.viewport.clientWidth;
-  const height = state.viewport.clientHeight;
+  const width = previewStage.clientWidth;
+  const height = previewStage.clientHeight;
   if (!width || !height) return;
   state.scale = clampDiagramScale(
     Math.min(
+      1,
       (width - DIAGRAM_FIT_PADDING) / state.naturalWidth,
       (height - DIAGRAM_FIT_PADDING) / state.naturalHeight,
     ),
   );
-  state.x = (width - state.naturalWidth * state.scale) / 2;
-  state.y = (height - state.naturalHeight * state.scale) / 2;
   state.fitted = true;
-  renderDiagramTransform(state);
+  renderDiagramScale(state);
 }
 
 /**
  * @param {DiagramViewportState} state
  * @param {number} nextScale
- * @param {number} pointX
- * @param {number} pointY
+ * @param {number} clientX
+ * @param {number} clientY
  */
-function zoomDiagramAtPoint(state, nextScale, pointX, pointY) {
+function zoomDiagramAtPoint(state, nextScale, clientX, clientY) {
   const scale = clampDiagramScale(nextScale);
   if (scale === state.scale) return;
-  const diagramX = (pointX - state.x) / state.scale;
-  const diagramY = (pointY - state.y) / state.scale;
-  state.x = pointX - diagramX * scale;
-  state.y = pointY - diagramY * scale;
+  const before = state.canvas.getBoundingClientRect();
+  const anchorX = Math.min(
+    1,
+    Math.max(0, before.width ? (clientX - before.left) / before.width : 0.5),
+  );
+  const anchorY = Math.min(
+    1,
+    Math.max(0, before.height ? (clientY - before.top) / before.height : 0.5),
+  );
   state.scale = scale;
   state.fitted = false;
-  renderDiagramTransform(state);
+  renderDiagramScale(state);
+  const after = state.canvas.getBoundingClientRect();
+  previewStage.scrollLeft +=
+    after.left + after.width * anchorX - clientX;
+  previewStage.scrollTop +=
+    after.top + after.height * anchorY - clientY;
 }
 
 /**
@@ -707,11 +714,12 @@ function zoomDiagramAtPoint(state, nextScale, pointX, pointY) {
  * @param {number} multiplier
  */
 function zoomDiagramFromCenter(state, multiplier) {
+  const bounds = previewStage.getBoundingClientRect();
   zoomDiagramAtPoint(
     state,
     state.scale * multiplier,
-    state.viewport.clientWidth / 2,
-    state.viewport.clientHeight / 2,
+    bounds.left + bounds.width / 2,
+    bounds.top + bounds.height / 2,
   );
 }
 
@@ -755,6 +763,11 @@ function prepareDiagramViewport(container) {
 
   const canvas = document.createElement("div");
   canvas.className = "mermaid-canvas";
+  canvas.style.setProperty("--diagram-natural-width", `${naturalWidth}px`);
+  canvas.style.setProperty(
+    "--diagram-aspect-ratio",
+    String(naturalWidth / naturalHeight),
+  );
   canvas.style.width = `${naturalWidth}px`;
   canvas.style.height = `${naturalHeight}px`;
   svg.replaceWith(viewport);
@@ -780,7 +793,7 @@ function prepareDiagramViewport(container) {
   fit.className = "diagram-fit-button";
   fit.dataset.diagramAction = "fit";
   controls.append(zoomOut, zoomLevel, zoomIn, fit);
-  viewport.append(controls);
+  viewport.prepend(controls);
 
   const help = document.createElement("span");
   help.className = "diagram-help";
@@ -789,19 +802,16 @@ function prepareDiagramViewport(container) {
 
   /** @type {DiagramViewportState} */
   const state = {
-    viewport,
     canvas,
     zoomLevel,
     naturalWidth,
     naturalHeight,
     scale: 1,
-    x: 0,
-    y: 0,
     fitted: true,
     pointerStartX: 0,
     pointerStartY: 0,
-    originX: 0,
-    originY: 0,
+    scrollStartLeft: 0,
+    scrollStartTop: 0,
     moved: false,
     suppressClick: false,
     resizeObserver: new ResizeObserver(() => {
@@ -830,13 +840,13 @@ function prepareDiagramViewport(container) {
   viewport.addEventListener(
     "wheel",
     (event) => {
+      if (!event.ctrlKey && !event.metaKey) return;
       if (
         event.target instanceof Element &&
         event.target.closest(".diagram-controls")
       ) {
         return;
       }
-      const bounds = viewport.getBoundingClientRect();
       const delta = Math.max(-100, Math.min(100, event.deltaY));
       const nextScale = clampDiagramScale(
         state.scale * Math.exp(-delta * 0.002),
@@ -846,8 +856,8 @@ function prepareDiagramViewport(container) {
       zoomDiagramAtPoint(
         state,
         nextScale,
-        event.clientX - bounds.left,
-        event.clientY - bounds.top,
+        event.clientX,
+        event.clientY,
       );
     },
     { passive: false },
@@ -864,8 +874,8 @@ function prepareDiagramViewport(container) {
     state.pointerId = event.pointerId;
     state.pointerStartX = event.clientX;
     state.pointerStartY = event.clientY;
-    state.originX = state.x;
-    state.originY = state.y;
+    state.scrollStartLeft = previewStage.scrollLeft;
+    state.scrollStartTop = previewStage.scrollTop;
     state.moved = false;
     viewport.setPointerCapture(event.pointerId);
     viewport.classList.add("is-panning");
@@ -876,10 +886,8 @@ function prepareDiagramViewport(container) {
     const deltaX = event.clientX - state.pointerStartX;
     const deltaY = event.clientY - state.pointerStartY;
     if (Math.abs(deltaX) + Math.abs(deltaY) > 3) state.moved = true;
-    state.x = state.originX + deltaX;
-    state.y = state.originY + deltaY;
-    state.fitted = false;
-    renderDiagramTransform(state);
+    previewStage.scrollLeft = state.scrollStartLeft - deltaX;
+    previewStage.scrollTop = state.scrollStartTop - deltaY;
   });
 
   const finishPan = (/** @type {PointerEvent} */ event) => {
@@ -930,16 +938,14 @@ function prepareDiagramViewport(container) {
       fitDiagramToViewport(state);
     } else if (event.key.startsWith("Arrow")) {
       event.preventDefault();
-      state.fitted = false;
-      if (event.key === "ArrowLeft") state.x -= 32;
-      if (event.key === "ArrowRight") state.x += 32;
-      if (event.key === "ArrowUp") state.y -= 32;
-      if (event.key === "ArrowDown") state.y += 32;
-      renderDiagramTransform(state);
+      if (event.key === "ArrowLeft") previewStage.scrollLeft -= 32;
+      if (event.key === "ArrowRight") previewStage.scrollLeft += 32;
+      if (event.key === "ArrowUp") previewStage.scrollTop -= 32;
+      if (event.key === "ArrowDown") previewStage.scrollTop += 32;
     }
   });
 
-  state.resizeObserver.observe(viewport);
+  state.resizeObserver.observe(previewStage);
   fitDiagramToViewport(state);
 }
 
