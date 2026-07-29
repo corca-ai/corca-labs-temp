@@ -10,7 +10,7 @@
     "slug": "workflow-viewer",
     "workspace": "@corca-labs/workflow-viewer",
     "source": "apps/workflow-viewer/dist",
-    "title": "Open AX Day · Workflow Viewer",
+    "title": "Workflow Viewer",
     "description": "Preview a local Mermaid workflow and save the confirmed diagram as PDF."
   }
 ]
