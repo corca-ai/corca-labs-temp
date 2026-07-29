@@ -714,8 +714,8 @@ try {
     themeVariables: {
       fontFamily:
         '"Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", sans-serif',
-      primaryColor: "#e1f5fe",
-      primaryBorderColor: "#01579b",
+      primaryColor: "#ffffff",
+      primaryBorderColor: "#64736d",
       lineColor: "#53645f",
       textColor: "#17231f",
     },
