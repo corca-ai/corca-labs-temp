@@ -2,125 +2,136 @@ import {
   choosePrintOrientation,
   filenameStem,
   isMarkdownFilename,
-  parseWorkflowMarkdown,
 } from "./workflow.js";
+import { decodeUrlState, encodePakoState } from "./url-state.js";
+import DOMPurify from "dompurify";
+import { marked } from "marked";
 
 const MERMAID_URL =
   "https://cdn.jsdelivr.net/npm/mermaid@11.12.0/dist/mermaid.esm.min.mjs";
 const POLL_INTERVAL_MS = 1_500;
+const EDIT_DELAY_MS = 220;
+const HASH_DELAY_MS = 320;
+const DEFAULT_CODE = `# Example workflow
+
+\`\`\`mermaid
+flowchart LR
+    input[Input] --> process[Process] --> output[Output]
+\`\`\``;
 
 const COPY = {
   ko: {
     title: "워크플로 뷰어",
-    description: "로컬 Mermaid 워크플로를 미리 보고 PDF로 저장하세요.",
+    description: "Mermaid를 지원하는 Markdown 문서를 편집하고 실시간으로 미리 보세요.",
     languageLabel: "언어 선택",
     open: "워크플로 열기",
     refresh: "새로고침",
     chooseAgain: "다시 선택",
     print: "인쇄 / PDF 저장",
     fileInputLabel: "워크플로 Markdown 파일 선택",
-    welcomeTitle: "워크플로를 열어 주세요",
-    welcomeInstruction: "를 선택하거나 Mermaid 워크플로 Markdown 파일을 여기에 끌어다 놓으세요.",
-    privacy: "워크플로 파일은 브라우저 안에만 머물며 업로드되지 않습니다.",
-    viewerLabel: "렌더링된 워크플로",
-    localOnly: "로컬 전용",
+    editorTitle: "Markdown 편집기",
+    editorNote: "입력하는 동안 미리보기가 자동으로 업데이트됩니다.",
+    editorLabel: "Mermaid를 지원하는 Markdown 문서",
+    urlBadge: "URL 동기화",
+    previewTitle: "미리보기",
+    diagramLabel: "Markdown 미리보기",
+    privacy: "로컬 파일은 업로드되지 않습니다. 공유 링크의 내용은 URL 조각에만 저장됩니다.",
+    browserOnly: "브라우저 전용",
+    dropTitle: "Markdown 파일 놓기",
+    dropNote: "파일에서 Mermaid 코드를 불러옵니다.",
     errorLabel: "워크플로를 표시할 수 없습니다",
-    errorTitle: "파일을 확인하고 다시 시도해 주세요",
-    watching: (/** @type {string} */ time) => `변경 사항 확인 중 · ${time} 업데이트`,
+    errorTitle: "Mermaid 블록을 확인해 주세요",
+    live: "실시간 미리보기 · URL 동기화됨",
+    urlError: "공유 URL을 읽지 못해 예제 그래프를 열었습니다",
+    watching: (/** @type {string} */ time) => `파일 변경 확인 중 · ${time} 업데이트`,
     fallback: (/** @type {string} */ time) => `${time} 업데이트 · 변경 사항을 읽으려면 파일을 다시 선택하세요`,
-    attention: "워크플로를 확인해 주세요",
+    attention: "Mermaid 블록을 확인해 주세요",
     accessPaused: "파일 접근이 중단되었습니다 · 워크플로를 다시 선택하세요",
     rendererLoading: "다이어그램 렌더러를 불러오는 중입니다. 잠시 후 다시 시도해 주세요.",
-    parseError: "비어 있지 않은 ```mermaid 코드 블록 하나만 있어야 하며 다른 Markdown 내용은 포함할 수 없습니다.",
-    parseGuidance: "Markdown 파일에는 Mermaid 코드 블록 하나만 남긴 다음 새로고침하세요.",
-    mermaidGuidance: "Mermaid 다이어그램을 수정한 다음 파일을 새로고침하세요. 다른 워크플로를 열어도 됩니다.",
+    mermaidGuidance: "왼쪽 Markdown 편집기에서 Mermaid 코드 블록의 문법을 수정하세요.",
     notMarkdown: "Markdown(.md) 파일이 아닙니다.",
-    notMarkdownGuidance: "FLOW_ORG_NAME_SHORT_TITLE.md 형식의 파일을 선택하세요.",
+    notMarkdownGuidance: ".md 파일을 선택하세요.",
     rendererError: "Mermaid 렌더러를 불러올 수 없습니다.",
     rendererGuidance: "인터넷 연결을 확인한 다음 페이지를 새로고침하세요. 로컬 파일에는 접근하지 않았습니다.",
   },
   en: {
     title: "Workflow viewer",
-    description: "Preview a local Mermaid workflow and print it as a PDF.",
+    description: "Edit and preview Markdown with Mermaid diagram support.",
     languageLabel: "Choose language",
     open: "Open workflow",
     refresh: "Refresh",
     chooseAgain: "Choose again",
     print: "Print / Save PDF",
     fileInputLabel: "Choose a workflow Markdown file",
-    welcomeTitle: "Open your workflow",
-    welcomeInstruction: ", or drag a Mermaid workflow Markdown file here.",
-    privacy: "Your workflow file stays in this browser and is not uploaded.",
-    viewerLabel: "Rendered workflow",
-    localOnly: "Local only",
+    editorTitle: "Markdown editor",
+    editorNote: "The preview updates automatically while you type.",
+    editorLabel: "Markdown document with Mermaid support",
+    urlBadge: "URL synced",
+    previewTitle: "Preview",
+    diagramLabel: "Markdown preview",
+    privacy: "Local files are not uploaded. Shared content is stored only in the URL fragment.",
+    browserOnly: "Browser only",
+    dropTitle: "Drop Markdown file",
+    dropNote: "Load Mermaid code from the file.",
     errorLabel: "Couldn’t show this workflow",
-    errorTitle: "Check the file and try again",
-    watching: (/** @type {string} */ time) => `Watching for changes · Updated ${time}`,
+    errorTitle: "Check the Mermaid block",
+    live: "Live preview · URL synced",
+    urlError: "Could not read the shared URL, so the example graph was opened",
+    watching: (/** @type {string} */ time) => `Watching file changes · Updated ${time}`,
     fallback: (/** @type {string} */ time) => `Updated ${time} · Choose the file again to reread changes`,
-    attention: "The workflow needs attention",
+    attention: "Check the Mermaid block",
     accessPaused: "File access paused · Select the workflow again",
     rendererLoading: "The diagram renderer is still loading. Please try again.",
-    parseError: "Expected exactly one non-empty ```mermaid code block and no other Markdown content.",
-    parseGuidance: "Keep only one Mermaid code block in the Markdown file, then refresh it.",
-    mermaidGuidance: "Correct the Mermaid diagram, then refresh this file. You can also open another workflow.",
+    mermaidGuidance: "Correct the Mermaid block syntax in the Markdown editor.",
     notMarkdown: "This is not a Markdown (.md) file.",
-    notMarkdownGuidance: "Choose a file named FLOW_ORG_NAME_SHORT_TITLE.md.",
+    notMarkdownGuidance: "Choose a .md file.",
     rendererError: "Could not load the Mermaid renderer.",
     rendererGuidance: "Check your internet connection and reload this page. Your local file was not accessed.",
   },
 };
 
 /** @typedef {"ko" | "en"} Language */
-/** @typedef {"none" | "watching" | "fallback" | "attention" | "accessPaused"} StatusMode */
+/** @typedef {"live" | "urlError" | "watching" | "fallback" | "attention" | "accessPaused"} StatusMode */
 
-const documentTitle =
-  /** @type {HTMLElement} */ (document.querySelector("#document-title"));
+const get = {
+  element: (/** @type {string} */ selector) =>
+    /** @type {HTMLElement} */ (document.querySelector(selector)),
+  button: (/** @type {string} */ selector) =>
+    /** @type {HTMLButtonElement} */ (document.querySelector(selector)),
+};
+
+const documentTitle = get.element("#document-title");
 const pageDescription =
   /** @type {HTMLMetaElement} */ (document.querySelector("#page-description"));
-const languageSwitch =
-  /** @type {HTMLElement} */ (document.querySelector("#language-switch"));
+const languageSwitch = get.element("#language-switch");
 const languageOptions =
   /** @type {NodeListOf<HTMLButtonElement>} */ (
     document.querySelectorAll(".language-option")
   );
-const openButton =
-  /** @type {HTMLButtonElement} */ (document.querySelector("#open-button"));
-const refreshButton =
-  /** @type {HTMLButtonElement} */ (document.querySelector("#refresh-button"));
-const printButton =
-  /** @type {HTMLButtonElement} */ (document.querySelector("#print-button"));
+const openButton = get.button("#open-button");
+const refreshButton = get.button("#refresh-button");
+const printButton = get.button("#print-button");
 const fileInput =
   /** @type {HTMLInputElement} */ (document.querySelector("#file-input"));
-const dropZone = /** @type {HTMLElement} */ (document.querySelector("#drop-zone"));
-const welcomePanel =
-  /** @type {HTMLElement} */ (document.querySelector("#welcome-panel"));
-const viewerPanel =
-  /** @type {HTMLElement} */ (document.querySelector("#viewer-panel"));
-const errorPanel =
-  /** @type {HTMLElement} */ (document.querySelector("#error-panel"));
-const errorDetail =
-  /** @type {HTMLElement} */ (document.querySelector("#error-detail"));
-const errorGuidance =
-  /** @type {HTMLElement} */ (document.querySelector("#error-guidance"));
-const welcomeTitle =
-  /** @type {HTMLElement} */ (document.querySelector("#welcome-title"));
-const welcomeAction =
-  /** @type {HTMLElement} */ (document.querySelector("#welcome-action"));
-const welcomeInstruction =
-  /** @type {HTMLElement} */ (document.querySelector("#welcome-instruction"));
-const privacyNote =
-  /** @type {HTMLElement} */ (document.querySelector("#privacy-note"));
-const localBadge =
-  /** @type {HTMLElement} */ (document.querySelector("#local-badge"));
-const errorLabel =
-  /** @type {HTMLElement} */ (document.querySelector("#error-label"));
-const errorTitle =
-  /** @type {HTMLElement} */ (document.querySelector("#error-title"));
-const filenameElement =
-  /** @type {HTMLElement} */ (document.querySelector("#filename"));
-const statusElement =
-  /** @type {HTMLElement} */ (document.querySelector("#status"));
-const diagram = /** @type {HTMLElement} */ (document.querySelector("#diagram"));
+const dropZone = get.element("#drop-zone");
+const editor = /** @type {HTMLTextAreaElement} */ (document.querySelector("#editor"));
+const editorTitle = get.element("#editor-title");
+const editorNote = get.element("#editor-note");
+const urlBadge = get.element("#url-badge");
+const previewTitle = get.element("#preview-title");
+const viewerPanel = get.element("#viewer-panel");
+const privacyNote = get.element("#privacy-note");
+const localBadge = get.element("#local-badge");
+const dropTitle = get.element("#drop-title");
+const dropNote = get.element("#drop-note");
+const filenameElement = get.element("#filename");
+const statusElement = get.element("#status");
+const preview = get.element("#preview");
+const errorPanel = get.element("#error-panel");
+const errorLabel = get.element("#error-label");
+const errorTitle = get.element("#error-title");
+const errorDetail = get.element("#error-detail");
+const errorGuidance = get.element("#error-guidance");
 const printPageStyle =
   /** @type {HTMLStyleElement} */ (document.querySelector("#print-page-style"));
 const pickerWindow =
@@ -136,51 +147,47 @@ let fileHandle;
 let fallbackFile;
 /** @type {string | undefined} */
 let lastObservedText;
-let renderNumber = 0;
-let pollInProgress = false;
-let activeRender = 0;
-let currentStem = "";
 /** @type {Language} */
 let activeLanguage = "ko";
 /** @type {StatusMode} */
-let statusMode = "none";
+let statusMode = "live";
 /** @type {Date | undefined} */
 let statusTime;
-/** @type {{ problem: unknown, guidanceKey: "parseGuidance" | "mermaidGuidance" | "notMarkdownGuidance" | "rendererGuidance", detailKey?: "parseError" | "notMarkdown", prefixKey?: "rendererError" } | undefined} */
+/** @type {{ problem: unknown, guidanceKey: "mermaidGuidance" | "notMarkdownGuidance" | "rendererGuidance", detailKey?: "notMarkdown", prefixKey?: "rendererError" } | undefined} */
 let currentError;
+let renderNumber = 0;
+let activeRender = 0;
+let pollInProgress = false;
+/** @type {number | undefined} */
+let renderTimer;
+/** @type {number | undefined} */
+let hashTimer;
+let currentStem = "workflow";
 
-function nowLabel() {
+/** @param {Date} date */
+function formattedTime(date) {
   return new Intl.DateTimeFormat(activeLanguage === "ko" ? "ko-KR" : "en", {
     hour: "numeric",
     minute: "2-digit",
     second: "2-digit",
-  }).format(new Date());
+  }).format(date);
 }
 
 function updateStatus() {
+  const copy = COPY[activeLanguage];
   if (statusMode === "watching" && statusTime) {
-    statusElement.textContent = COPY[activeLanguage].watching(
-      new Intl.DateTimeFormat(activeLanguage === "ko" ? "ko-KR" : "en", {
-        hour: "numeric",
-        minute: "2-digit",
-        second: "2-digit",
-      }).format(statusTime),
-    );
+    statusElement.textContent = copy.watching(formattedTime(statusTime));
   } else if (statusMode === "fallback" && statusTime) {
-    statusElement.textContent = COPY[activeLanguage].fallback(
-      new Intl.DateTimeFormat(activeLanguage === "ko" ? "ko-KR" : "en", {
-        hour: "numeric",
-        minute: "2-digit",
-        second: "2-digit",
-      }).format(statusTime),
-    );
+    statusElement.textContent = copy.fallback(formattedTime(statusTime));
   } else {
     statusElement.textContent =
-      statusMode === "attention"
-        ? COPY[activeLanguage].attention
-        : statusMode === "accessPaused"
-          ? COPY[activeLanguage].accessPaused
-          : "";
+      statusMode === "live"
+        ? copy.live
+        : statusMode === "urlError"
+          ? copy.urlError
+          : statusMode === "attention"
+            ? copy.attention
+            : copy.accessPaused;
   }
 }
 
@@ -201,12 +208,11 @@ function renderErrorCopy() {
     currentError.problem instanceof Error
       ? currentError.problem.message
       : String(currentError.problem);
-  const detail = currentError.detailKey
+  errorDetail.textContent = currentError.detailKey
     ? copy[currentError.detailKey]
     : currentError.prefixKey
       ? `${copy[currentError.prefixKey]}\n\n${rawMessage}`
       : rawMessage;
-  errorDetail.textContent = detail;
   errorGuidance.textContent = copy[currentError.guidanceKey];
 }
 
@@ -219,12 +225,17 @@ function applyTranslations() {
   refreshButton.textContent = fileHandle ? copy.refresh : copy.chooseAgain;
   printButton.textContent = copy.print;
   fileInput.setAttribute("aria-label", copy.fileInputLabel);
-  welcomeTitle.textContent = copy.welcomeTitle;
-  welcomeAction.textContent = copy.open;
-  welcomeInstruction.textContent = copy.welcomeInstruction;
+  editorTitle.textContent = copy.editorTitle;
+  editorNote.textContent = copy.editorNote;
+  editor.setAttribute("aria-label", copy.editorLabel);
+  urlBadge.textContent = copy.urlBadge;
+  previewTitle.textContent = copy.previewTitle;
+  preview.setAttribute("aria-label", copy.diagramLabel);
+  viewerPanel.setAttribute("aria-label", copy.previewTitle);
   privacyNote.textContent = copy.privacy;
-  viewerPanel.setAttribute("aria-label", copy.viewerLabel);
-  localBadge.textContent = copy.localOnly;
+  localBadge.textContent = copy.browserOnly;
+  dropTitle.textContent = copy.dropTitle;
+  dropNote.textContent = copy.dropNote;
   errorLabel.textContent = copy.errorLabel;
   errorTitle.textContent = copy.errorTitle;
   for (const option of languageOptions) {
@@ -233,37 +244,19 @@ function applyTranslations() {
       String(option.dataset.language === activeLanguage),
     );
   }
-  if (!currentStem) {
-    documentTitle.textContent = copy.title;
-    document.title = copy.title;
-  }
+  documentTitle.textContent = currentStem === "workflow" ? copy.title : currentStem;
+  document.title = currentStem === "workflow" ? copy.title : currentStem;
   updateStatus();
   renderErrorCopy();
 }
 
-/**
- * @param {string} filename
- */
+/** @param {string} filename */
 function setFilename(filename) {
   filenameElement.textContent = filename;
-  currentStem = filenameStem(filename);
-  documentTitle.textContent = currentStem;
-  document.title = currentStem;
-}
-
-/**
- * @param {unknown} problem
- * @param {"parseGuidance" | "mermaidGuidance" | "notMarkdownGuidance" | "rendererGuidance"} guidanceKey
- * @param {"parseError" | "notMarkdown"} [detailKey]
- * @param {"rendererError"} [prefixKey]
- */
-function showError(problem, guidanceKey, detailKey, prefixKey) {
-  currentError = { problem, guidanceKey, detailKey, prefixKey };
-  welcomePanel.hidden = true;
-  viewerPanel.hidden = true;
-  errorPanel.hidden = false;
-  renderErrorCopy();
-  printButton.disabled = true;
+  currentStem = filename ? filenameStem(filename) : "workflow";
+  documentTitle.textContent =
+    currentStem === "workflow" ? COPY[activeLanguage].title : currentStem;
+  document.title = documentTitle.textContent;
 }
 
 function updateRefreshUi() {
@@ -274,52 +267,167 @@ function updateRefreshUi() {
 }
 
 /**
- * @param {string} source
- * @param {string} filename
- * @param {number} requestId
+ * @param {unknown} problem
+ * @param {"mermaidGuidance" | "notMarkdownGuidance" | "rendererGuidance"} guidanceKey
+ * @param {"notMarkdown"} [detailKey]
+ * @param {"rendererError"} [prefixKey]
  */
-async function renderSource(source, filename, requestId) {
-  if (!mermaid) {
-    throw new Error(COPY[activeLanguage].rendererLoading);
-  }
+function showError(problem, guidanceKey, detailKey, prefixKey) {
+  currentError = { problem, guidanceKey, detailKey, prefixKey };
+  errorPanel.hidden = false;
+  printButton.disabled = true;
+  renderErrorCopy();
+}
 
-  const rendered = await mermaid.render(`workflow-${renderNumber++}`, source);
-  if (requestId !== activeRender) return;
+function updatePrintOrientation() {
+  const onlyChild = preview.children.length === 1 ? preview.firstElementChild : null;
+  const svg =
+    onlyChild?.classList.contains("mermaid-diagram")
+      ? onlyChild.querySelector("svg")
+      : null;
+  const orientation =
+    svg instanceof SVGSVGElement
+      ? choosePrintOrientation(
+          svg.viewBox.baseVal.width || svg.getBoundingClientRect().width,
+          svg.viewBox.baseVal.height || svg.getBoundingClientRect().height,
+        )
+      : "portrait";
+  document.documentElement.dataset.printOrientation = orientation;
+  printPageStyle.textContent = `@page { size: A4 ${orientation}; margin: 10mm; }`;
+}
 
-  diagram.replaceChildren();
-  diagram.insertAdjacentHTML("afterbegin", rendered.svg);
-  rendered.bindFunctions?.(diagram);
-  setFilename(filename);
-  welcomePanel.hidden = true;
-  errorPanel.hidden = true;
-  viewerPanel.hidden = false;
-  currentError = undefined;
-  setStatus(fileHandle ? "watching" : "fallback", new Date());
-  printButton.disabled = false;
-  updatePrintOrientation();
+/** @param {string} code */
+function scheduleHashUpdate(code) {
+  window.clearTimeout(hashTimer);
+  hashTimer = window.setTimeout(() => {
+    history.replaceState(undefined, "", `#${encodePakoState(code)}`);
+  }, HASH_DELAY_MS);
 }
 
 /**
- * @param {File} file
+ * Convert bare Mermaid Live content into a one-block Markdown document.
+ * @param {string} content
  */
-async function renderFile(file) {
-  const requestId = ++activeRender;
-  setFilename(file.name);
+function normalizeMarkdownInput(content) {
+  if (/```mermaid\b/iu.test(content)) return content;
+  if (
+    /^\s*(?:---[\s\S]*?---\s*)?(?:flowchart|graph|sequenceDiagram|classDiagram|stateDiagram(?:-v2)?|erDiagram|journey|gantt|pie|quadrantChart|requirementDiagram|gitGraph|mindmap|timeline|zenuml|sankey-beta|xychart-beta|block-beta|packet-beta|architecture-beta|kanban)\b/iu.test(
+      content,
+    )
+  ) {
+    return `\`\`\`mermaid\n${content.trim()}\n\`\`\``;
+  }
+  return content;
+}
 
+/**
+ * @param {string} markdown
+ * @param {StatusMode} successMode
+ * @param {Date} [successTime]
+ */
+async function renderMarkdown(markdown, successMode, successTime) {
+  const requestId = ++activeRender;
+  if (!mermaid) {
+    showError(
+      new Error(COPY[activeLanguage].rendererLoading),
+      "mermaidGuidance",
+    );
+    return;
+  }
+
+  try {
+    const rawHtml = await marked.parse(markdown);
+    if (requestId !== activeRender) return;
+    preview.innerHTML = DOMPurify.sanitize(rawHtml);
+    for (const link of preview.querySelectorAll("a")) {
+      link.setAttribute("rel", "noopener noreferrer");
+    }
+
+    const mermaidBlocks = Array.from(
+      preview.querySelectorAll("pre > code.language-mermaid"),
+    );
+    /** @type {unknown[]} */
+    const blockErrors = [];
+
+    for (const [index, block] of mermaidBlocks.entries()) {
+      const pre = block.parentElement;
+      if (!pre) continue;
+      try {
+        const rendered = await mermaid.render(
+          `workflow-${renderNumber++}-${index}`,
+          block.textContent ?? "",
+        );
+        if (requestId !== activeRender) return;
+        const container = document.createElement("div");
+        container.className = "mermaid-diagram";
+        container.insertAdjacentHTML("afterbegin", rendered.svg);
+        rendered.bindFunctions?.(container);
+        pre.replaceWith(container);
+      } catch (problem) {
+        blockErrors.push(problem);
+        pre.classList.add("mermaid-block-error");
+      }
+    }
+
+    if (requestId !== activeRender) return;
+    if (blockErrors.length > 0) {
+      showError(blockErrors[0], "mermaidGuidance");
+      setStatus("attention");
+    } else {
+      errorPanel.hidden = true;
+      currentError = undefined;
+      printButton.disabled = false;
+      setStatus(successMode, successTime);
+    }
+    updatePrintOrientation();
+  } catch (problem) {
+    if (requestId !== activeRender) return;
+    showError(problem, "mermaidGuidance");
+    setStatus("attention");
+  }
+}
+
+function scheduleEditorRender() {
+  window.clearTimeout(renderTimer);
+  renderTimer = window.setTimeout(() => {
+    void renderMarkdown(editor.value, "live");
+  }, EDIT_DELAY_MS);
+}
+
+function detachFile() {
+  fileHandle = undefined;
+  fallbackFile = undefined;
+  lastObservedText = undefined;
+  setFilename("");
+  updateRefreshUi();
+}
+
+/**
+ * @param {string} content
+ * @param {StatusMode} mode
+ * @param {Date} [time]
+ * @param {boolean} [syncHash]
+ */
+function applyEditorCode(content, mode, time, syncHash = true) {
+  const markdown = normalizeMarkdownInput(content);
+  editor.value = markdown;
+  if (syncHash) scheduleHashUpdate(markdown);
+  void renderMarkdown(markdown, mode, time);
+}
+
+/** @param {File} file */
+async function renderFile(file) {
+  setFilename(file.name);
   try {
     const text = await file.text();
     lastObservedText = text;
-    const source = parseWorkflowMarkdown(text);
-    await renderSource(source, file.name, requestId);
-  } catch (problem) {
-    if (requestId !== activeRender) return;
-    const parseProblem =
-      problem instanceof Error && problem.message.startsWith("Expected exactly");
-    showError(
-      problem,
-      parseProblem ? "parseGuidance" : "mermaidGuidance",
-      parseProblem ? "parseError" : undefined,
+    applyEditorCode(
+      text,
+      fileHandle ? "watching" : "fallback",
+      new Date(),
     );
+  } catch (problem) {
+    showError(problem, "mermaidGuidance");
     setStatus("attention");
   } finally {
     updateRefreshUi();
@@ -328,8 +436,7 @@ async function renderFile(file) {
 
 async function readHandle() {
   if (!fileHandle) return;
-  const file = await fileHandle.getFile();
-  await renderFile(file);
+  await renderFile(await fileHandle.getFile());
 }
 
 function chooseFallbackFile() {
@@ -340,7 +447,7 @@ function chooseFallbackFile() {
 async function chooseFile() {
   if (pickerWindow.showOpenFilePicker) {
     try {
-      const handles = await pickerWindow.showOpenFilePicker({
+      const [chosenHandle] = await pickerWindow.showOpenFilePicker({
         types: [
           {
             description: "Workflow Markdown",
@@ -349,7 +456,6 @@ async function chooseFile() {
         ],
         multiple: false,
       });
-      const [chosenHandle] = handles;
       fileHandle = chosenHandle;
       fallbackFile = undefined;
       await readHandle();
@@ -358,13 +464,10 @@ async function chooseFile() {
       if (problem instanceof DOMException && problem.name === "AbortError") return;
     }
   }
-
   chooseFallbackFile();
 }
 
-/**
- * @param {File} file
- */
+/** @param {File} file */
 async function useFallbackFile(file) {
   fileHandle = undefined;
   fallbackFile = file;
@@ -374,18 +477,15 @@ async function useFallbackFile(file) {
 async function pollForChanges() {
   if (!fileHandle || pollInProgress || document.visibilityState === "hidden") return;
   pollInProgress = true;
-
   try {
     const file = await fileHandle.getFile();
     const text = await file.text();
-    if (text !== lastObservedText) {
-      await renderFile(file);
-    }
+    if (text !== lastObservedText) await renderFile(file);
   } catch (problem) {
     if (problem instanceof DOMException && problem.name === "NotAllowedError") {
-      setStatus("accessPaused");
       fileHandle = undefined;
       fallbackFile = undefined;
+      setStatus("accessPaused");
       updateRefreshUi();
     }
   } finally {
@@ -393,19 +493,22 @@ async function pollForChanges() {
   }
 }
 
-function updatePrintOrientation() {
-  const svg = diagram.querySelector("svg");
-  if (!(svg instanceof SVGSVGElement)) return;
-
-  const viewBox = svg.viewBox.baseVal;
-  const width = viewBox.width || svg.getBoundingClientRect().width;
-  const height = viewBox.height || svg.getBoundingClientRect().height;
-  const orientation = choosePrintOrientation(width, height);
-  document.documentElement.dataset.printOrientation = orientation;
-  printPageStyle.textContent = `@page { size: A4 ${orientation}; margin: 10mm; }`;
+function loadHash() {
+  try {
+    const code = decodeUrlState(location.hash);
+    if (code !== undefined) {
+      setFilename("");
+      applyEditorCode(code, "live", undefined, false);
+      return;
+    }
+    setFilename("");
+    applyEditorCode(DEFAULT_CODE, "live", undefined, false);
+  } catch {
+    setFilename("");
+    editor.value = DEFAULT_CODE;
+    void renderMarkdown(DEFAULT_CODE, "urlError");
+  }
 }
-
-openButton.addEventListener("click", () => void chooseFile());
 
 languageSwitch.addEventListener("click", (event) => {
   const button =
@@ -419,18 +522,29 @@ languageSwitch.addEventListener("click", (event) => {
   applyTranslations();
 });
 
+openButton.addEventListener("click", () => void chooseFile());
 refreshButton.addEventListener("click", () => {
-  if (fileHandle) {
-    void readHandle();
-  } else {
-    chooseFallbackFile();
-  }
+  if (fileHandle) void readHandle();
+  else chooseFallbackFile();
 });
-
 printButton.addEventListener("click", () => {
   document.title = currentStem;
   updatePrintOrientation();
   window.print();
+});
+
+editor.addEventListener("input", () => {
+  detachFile();
+  setStatus("live");
+  scheduleEditorRender();
+  scheduleHashUpdate(editor.value);
+});
+editor.addEventListener("keydown", (event) => {
+  if (event.key !== "Tab") return;
+  event.preventDefault();
+  const start = editor.selectionStart;
+  editor.setRangeText("    ", start, editor.selectionEnd, "end");
+  editor.dispatchEvent(new Event("input", { bubbles: true }));
 });
 
 fileInput.addEventListener("change", () => {
@@ -444,7 +558,6 @@ for (const eventName of ["dragenter", "dragover"]) {
     dropZone.classList.add("is-dragging");
   });
 }
-
 for (const eventName of ["dragleave", "drop"]) {
   dropZone.addEventListener(eventName, (event) => {
     event.preventDefault();
@@ -458,15 +571,12 @@ for (const eventName of ["dragleave", "drop"]) {
     }
   });
 }
-
 dropZone.addEventListener("drop", async (event) => {
   if (!(event instanceof DragEvent)) return;
   const [item] = event.dataTransfer?.items ?? [];
   const [file] = event.dataTransfer?.files ?? [];
   if (!file) return;
-
   if (!isMarkdownFilename(file.name)) {
-    setFilename(file.name);
     showError(
       new Error("Not a Markdown file"),
       "notMarkdownGuidance",
@@ -474,7 +584,6 @@ dropZone.addEventListener("drop", async (event) => {
     );
     return;
   }
-
   if (item && "getAsFileSystemHandle" in item) {
     try {
       const handle = await /** @type {DataTransferItem & { getAsFileSystemHandle: () => Promise<FileSystemHandle | null> }} */ (
@@ -487,17 +596,21 @@ dropZone.addEventListener("drop", async (event) => {
         return;
       }
     } catch {
-      // Drag-and-drop remains fully functional through the File fallback.
+      // Continue with the browser File fallback.
     }
   }
-
   await useFallbackFile(file);
 });
 
+window.addEventListener("hashchange", loadHash);
+window.addEventListener("beforeprint", updatePrintOrientation);
+window.addEventListener("afterprint", () => {
+  document.title =
+    currentStem === "workflow" ? COPY[activeLanguage].title : currentStem;
+});
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") void pollForChanges();
 });
-window.addEventListener("beforeprint", updatePrintOrientation);
 window.setInterval(() => void pollForChanges(), POLL_INTERVAL_MS);
 
 try {
@@ -515,20 +628,13 @@ try {
       lineColor: "#53645f",
       textColor: "#17231f",
     },
-    flowchart: {
-      htmlLabels: true,
-      useMaxWidth: true,
-    },
+    flowchart: { htmlLabels: true, useMaxWidth: true },
   });
   mermaid = loadedMermaid;
   openButton.disabled = false;
+  loadHash();
 } catch (problem) {
-  showError(
-    problem,
-    "rendererGuidance",
-    undefined,
-    "rendererError",
-  );
+  showError(problem, "rendererGuidance", undefined, "rendererError");
 }
 
 applyTranslations();

@@ -11,6 +11,6 @@
     "workspace": "@corca-labs/workflow-viewer",
     "source": "apps/workflow-viewer/dist",
     "title": "Workflow Viewer",
-    "description": "Preview a local Mermaid workflow and save the confirmed diagram as PDF."
+    "description": "Edit and preview Markdown with Mermaid diagrams, then print or share it."
   }
 ]

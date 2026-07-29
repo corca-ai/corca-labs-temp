@@ -53,36 +53,51 @@
     </header>
 
     <main id="drop-zone" class="workspace">
-      <section id="welcome-panel" class="welcome-panel" aria-labelledby="welcome-title">
-        <div class="file-mark" aria-hidden="true">.md</div>
-        <div>
-          <h2 id="welcome-title">워크플로를 열어 주세요</h2>
-          <p>
-            <strong id="welcome-action">워크플로 열기</strong><span id="welcome-instruction">를 선택하거나 Mermaid 워크플로 Markdown 파일을 여기에 끌어다 놓으세요.</span>
-          </p>
-          <p id="privacy-note" class="privacy-note">
-            워크플로 파일은 브라우저 안에만 머물며 업로드되지 않습니다.
-          </p>
+      <section class="editor-panel pane" aria-labelledby="editor-title">
+        <div class="pane-header">
+          <div>
+          <h2 id="editor-title">Markdown 편집기</h2>
+            <span id="editor-note" class="pane-note">입력하는 동안 미리보기가 자동으로 업데이트됩니다.</span>
+          </div>
+          <span id="url-badge" class="url-badge">URL 동기화</span>
         </div>
+        <textarea
+          id="editor"
+          class="editor"
+          aria-label="Mermaid를 지원하는 Markdown 문서"
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+        ></textarea>
+        <p id="privacy-note" class="privacy-note">
+          로컬 파일은 업로드되지 않습니다. 공유 링크의 내용은 URL 조각에만 저장됩니다.
+        </p>
       </section>
 
-      <section id="viewer-panel" class="viewer-panel" hidden aria-label="렌더링된 워크플로">
-        <div class="file-status">
+      <section id="viewer-panel" class="viewer-panel pane" aria-labelledby="preview-title">
+        <div class="pane-header preview-header">
           <div class="file-details">
+            <h2 id="preview-title">미리보기</h2>
             <span id="filename" class="filename"></span>
             <span id="status" class="status" role="status" aria-live="polite"></span>
           </div>
-          <span id="local-badge" class="local-badge">로컬 전용</span>
+          <span id="local-badge" class="local-badge">브라우저 전용</span>
         </div>
-        <div id="diagram" class="diagram" aria-label="Workflow diagram"></div>
+        <div class="preview-stage">
+          <article id="preview" class="markdown-preview" aria-label="Markdown 미리보기"></article>
+          <section id="error-panel" class="error-panel" hidden role="alert">
+            <span id="error-label" class="error-label">워크플로를 표시할 수 없습니다</span>
+            <h3 id="error-title">Mermaid 코드를 확인해 주세요</h3>
+            <pre id="error-detail"></pre>
+            <p id="error-guidance"></p>
+          </section>
+        </div>
       </section>
 
-      <section id="error-panel" class="error-panel" hidden role="alert">
-        <span id="error-label" class="error-label">워크플로를 표시할 수 없습니다</span>
-        <h2 id="error-title">파일을 확인하고 다시 시도해 주세요</h2>
-        <pre id="error-detail"></pre>
-        <p id="error-guidance"></p>
-      </section>
+      <div id="drop-overlay" class="drop-overlay" aria-hidden="true">
+        <strong id="drop-title">Markdown 파일 놓기</strong>
+        <span id="drop-note">파일에서 Mermaid 코드를 불러옵니다.</span>
+      </div>
     </main>
 
     <style id="print-page-style">

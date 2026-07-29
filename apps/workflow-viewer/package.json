@@ -10,6 +10,12 @@
     "test": "node --test test/*.test.js"
   },
   "devDependencies": {
+    "@types/pako": "^2.0.4",
     "vite": "^8.1.5"
+  },
+  "dependencies": {
+    "dompurify": "^3.4.12",
+    "marked": "^18.0.7",
+    "pako": "^2.1.0"
   }
 }
