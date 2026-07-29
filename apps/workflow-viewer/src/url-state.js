@@ -27,10 +27,12 @@ function base64UrlToBytes(encoded) {
 /**
  * Serialize a Mermaid Live-compatible state fragment.
  * @param {string} code
+ * @param {string} [filename]
  */
-export function encodePakoState(code) {
+export function encodePakoState(code, filename) {
   const state = {
     code,
+    ...(filename ? { filename } : {}),
     mermaid: JSON.stringify({ theme: "default" }, null, 2),
     autoSync: true,
     updateDiagram: true,
@@ -74,5 +76,15 @@ export function decodeUrlState(fragment) {
   ) {
     throw new Error("URL state does not contain Mermaid code.");
   }
-  return state.code;
+  const filenameValue =
+    "filename" in state
+      ? state.filename
+      : "title" in state
+        ? state.title
+        : undefined;
+  const filename =
+    typeof filenameValue === "string"
+      ? filenameValue.split(/[\\/]/u).at(-1)?.trim().slice(0, 255) || undefined
+      : undefined;
+  return { code: state.code, filename };
 }

@@ -8,12 +8,15 @@ function base64Url(bytes) {
   return Buffer.from(bytes).toString("base64url");
 }
 
-test("round-trips Korean Mermaid code through pako URL state", () => {
+test("round-trips Korean Mermaid code and filename through pako URL state", () => {
   const code = 'flowchart TD\n  A["입력"] --> B["처리"]';
-  const fragment = encodePakoState(code);
+  const fragment = encodePakoState(code, "FLOW_조직_이름_업무.md");
 
   assert.match(fragment, /^pako:/);
-  assert.equal(decodeUrlState(fragment), code);
+  assert.deepEqual(decodeUrlState(fragment), {
+    code,
+    filename: "FLOW_조직_이름_업무.md",
+  });
 });
 
 test("decodes Mermaid Live-compatible pako state", () => {
@@ -27,17 +30,23 @@ test("decodes Mermaid Live-compatible pako state", () => {
     level: 9,
   });
 
-  assert.equal(
+  assert.deepEqual(
     decodeUrlState(`pako:${base64Url(compressed)}`),
-    "flowchart LR\n  A --> B",
+    { code: "flowchart LR\n  A --> B", filename: undefined },
   );
 });
 
-test("decodes base64 state and rejects malformed payloads", () => {
-  const state = JSON.stringify({ code: "sequenceDiagram\n  A->>B: Hello" });
-  assert.equal(
+test("decodes base64 state, accepts legacy title, and rejects malformed payloads", () => {
+  const state = JSON.stringify({
+    code: "sequenceDiagram\n  A->>B: Hello",
+    title: "Shared sequence",
+  });
+  assert.deepEqual(
     decodeUrlState(`base64:${Buffer.from(state).toString("base64url")}`),
-    "sequenceDiagram\n  A->>B: Hello",
+    {
+      code: "sequenceDiagram\n  A->>B: Hello",
+      filename: "Shared sequence",
+    },
   );
   assert.throws(() => decodeUrlState("pako:not-valid"), /invalid|incorrect/i);
   assert.throws(
@@ -46,5 +55,17 @@ test("decodes base64 state and rejects malformed payloads", () => {
         `base64:${Buffer.from('{"theme":"default"}').toString("base64url")}`,
       ),
     /does not contain/,
+  );
+});
+
+test("strips path components from untrusted shared filenames", () => {
+  const state = JSON.stringify({
+    code: "flowchart LR\n  A --> B",
+    filename: "../../FLOW_safe.md",
+  });
+
+  assert.deepEqual(
+    decodeUrlState(`base64:${Buffer.from(state).toString("base64url")}`),
+    { code: "flowchart LR\n  A --> B", filename: "FLOW_safe.md" },
   );
 });

@@ -163,6 +163,7 @@ let renderTimer;
 /** @type {number | undefined} */
 let hashTimer;
 let currentStem = "workflow";
+let currentFilename = "";
 
 /** @param {Date} date */
 function formattedTime(date) {
@@ -252,6 +253,7 @@ function applyTranslations() {
 
 /** @param {string} filename */
 function setFilename(filename) {
+  currentFilename = filename;
   filenameElement.textContent = filename;
   currentStem = filename ? filenameStem(filename) : "workflow";
   documentTitle.textContent =
@@ -300,7 +302,11 @@ function updatePrintOrientation() {
 function scheduleHashUpdate(code) {
   window.clearTimeout(hashTimer);
   hashTimer = window.setTimeout(() => {
-    history.replaceState(undefined, "", `#${encodePakoState(code)}`);
+    history.replaceState(
+      undefined,
+      "",
+      `#${encodePakoState(code, currentFilename || undefined)}`,
+    );
   }, HASH_DELAY_MS);
 }
 
@@ -398,7 +404,6 @@ function detachFile() {
   fileHandle = undefined;
   fallbackFile = undefined;
   lastObservedText = undefined;
-  setFilename("");
   updateRefreshUi();
 }
 
@@ -495,10 +500,10 @@ async function pollForChanges() {
 
 function loadHash() {
   try {
-    const code = decodeUrlState(location.hash);
-    if (code !== undefined) {
-      setFilename("");
-      applyEditorCode(code, "live", undefined, false);
+    const state = decodeUrlState(location.hash);
+    if (state !== undefined) {
+      setFilename(state.filename ?? "");
+      applyEditorCode(state.code, "live", undefined, false);
       return;
     }
     setFilename("");
