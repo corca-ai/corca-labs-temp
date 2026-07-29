@@ -19,7 +19,7 @@ const people = [
 
 const stage=document.querySelector("#stage"), drawer=document.querySelector("#drawer"), content=document.querySelector("#drawerContent");
 const search=document.querySelector("#search"), toast=document.querySelector("#toast"), empty=document.querySelector("#empty");
-let state={positions:{},groups:{},groupLabels:{},groupColors:{},notes:{},showNotes:false,history:[],dragStart:null,moved:false,selected:null};
+let state={positions:{},groups:{},groupLabels:{},groupColors:{},notes:{},showNotes:false,autoArrange:false,history:[],dragStart:null,moved:false,selected:null};
 let noteReflowTimer;
 const groupPalette=["#087f8c","#7656c9","#d74878","#d27a16","#2878c8","#6b9838","#d14d3f","#0b91b8","#9b5b32","#5966b3"];
 const layoutToken=name=>parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name))||0;
@@ -50,7 +50,7 @@ function initialPositions(){
   const rowStep=cardH()+layoutToken("--card-gap-y");
   people.forEach((p,i)=>{ const col=i%cols,row=Math.floor(i/cols); state.positions[p.id]={x:24+col*columnStep,y:28+row*rowStep}; });
 }
-function snapshot(){ return JSON.stringify({positions:state.positions,groups:state.groups,groupLabels:state.groupLabels,groupColors:state.groupColors,notes:state.notes,showNotes:state.showNotes}); }
+function snapshot(){ return JSON.stringify({positions:state.positions,groups:state.groups,groupLabels:state.groupLabels,groupColors:state.groupColors,notes:state.notes,showNotes:state.showNotes,autoArrange:state.autoArrange}); }
 function pushHistory(s){ if(state.history.at(-1)!==s){state.history.push(s);if(state.history.length>30)state.history.shift();} }
 function save(){
   const serialized=snapshot();
@@ -89,6 +89,7 @@ function load(){
       state.groupColors=s.groupColors||{};
       state.notes=s.notes||{};
       state.showNotes=Boolean(s.showNotes);
+      state.autoArrange=Boolean(s.autoArrange);
       [...new Set(Object.values(state.groups))].forEach(g=>{
         if(groupMembers(g).length<2){
           Object.keys(state.groups).forEach(id=>{if(state.groups[id]===g)delete state.groups[id]});
@@ -107,6 +108,10 @@ function applyNotesVisibility(){
   document.documentElement.classList.toggle("notes-visible",state.showNotes);
   const toggle=document.querySelector("#toggleNotes");
   if(toggle)toggle.checked=state.showNotes;
+}
+function applyAutoArrangeSetting(){
+  const toggle=document.querySelector("#toggleAutoArrange");
+  if(toggle)toggle.checked=state.autoArrange;
 }
 function updateCardNote(id){
   const noteEl=document.querySelector(`[data-id="${id}"] .card-note`);
@@ -167,7 +172,7 @@ function editGroupLabel(g){
   pushHistory(snapshot());
   const clean=next.trim().slice(0,40);
   if(clean)state.groupLabels[g]=clean;else{delete state.groupLabels[g];ensureGroupLabels()}
-  save();updateHulls();showToast(clean?"그룹 이름을 저장했어요":"자동 그룹 이름을 지정했어요");
+  settleLayoutChange(clean?"그룹 이름을 저장했어요":"자동 그룹 이름을 지정했어요",updateHulls);
 }
 function group(a,b){
   pushHistory(state.dragStart||snapshot());
@@ -178,13 +183,14 @@ function group(a,b){
     delete state.groupLabels[gb];
     delete state.groupColors[gb];
   }
-  state.groups[a]=g;state.groups[b]=g;ensureGroupLabels();save();updateGroupCardStyles();updateHulls();showToast("그룹을 만들었어요");
+  state.groups[a]=g;state.groups[b]=g;ensureGroupLabels();
+  settleLayoutChange("그룹을 만들었어요",()=>{updateGroupCardStyles();updateHulls()});
 }
 function ungroup(id){
   const g=state.groups[id];if(!g){showToast("이 카드는 그룹에 속해 있지 않아요");return}
   pushHistory(snapshot());delete state.groups[id];
   if(groupMembers(g).length<2){Object.keys(state.groups).forEach(k=>{if(state.groups[k]===g)delete state.groups[k]});delete state.groupLabels[g];delete state.groupColors[g]}
-  save();updateGroupCardStyles();updateHulls();showToast("그룹에서 분리했어요");
+  settleLayoutChange("그룹에서 분리했어요",()=>{updateGroupCardStyles();updateHulls()});
 }
 function shakeToUngroup(id){
   const g=state.groups[id];if(!g)return false;
@@ -304,6 +310,13 @@ function arrangeBoard(options={}){
   }
   save();render();if(!silent)showToast(message);
 }
+function settleLayoutChange(message,update=render){
+  if(state.autoArrange){
+    arrangeBoard({record:false,message:`${message.replace(/요$/,"")}고 자동 정렬했어요`});
+    return;
+  }
+  save();update();showToast(message);
+}
 function markdownText(value){
   return String(value||"").replace(/([\\`*_[\]<>])/g,"\\$1").replace(/\n+/g," ");
 }
@@ -349,7 +362,7 @@ function exportJson(){
     schema:"open-ax-day-people-canvas/v1",
     exportedAt:new Date().toISOString(),
     participants:people.map(({id,name,company})=>({id,name,company})),
-    board:{positions:state.positions,groups:state.groups,groupLabels:state.groupLabels,groupColors:state.groupColors,notes:state.notes,showNotes:state.showNotes}
+    board:{positions:state.positions,groups:state.groups,groupLabels:state.groupLabels,groupColors:state.groupColors,notes:state.notes,showNotes:state.showNotes,autoArrange:state.autoArrange}
   };
   downloadFile("open-ax-day-board.json",JSON.stringify(payload,null,2),"application/json;charset=utf-8");
   showToast("JSON 파일을 내보냈어요");
@@ -387,9 +400,10 @@ async function importJsonFile(file){
       const note=payload.board.notes?.[p.id];
       if(typeof note==="string"&&note.trim())notes[p.id]=note.slice(0,20000);
     });
-    pushHistory(snapshot());state.positions=positions;state.groups=groups;state.groupLabels=groupLabels;state.groupColors=groupColors;state.notes=notes;state.showNotes=Boolean(payload.board.showNotes);
+    pushHistory(snapshot());state.positions=positions;state.groups=groups;state.groupLabels=groupLabels;state.groupColors=groupColors;state.notes=notes;state.showNotes=Boolean(payload.board.showNotes);state.autoArrange=Boolean(payload.board.autoArrange);
     ensureGroupLabels();
-    applyNotesVisibility();save();render();showToast("JSON에서 보드 상태와 메모를 가져왔어요");
+    applyNotesVisibility();applyAutoArrangeSetting();
+    settleLayoutChange("JSON에서 보드 상태와 메모를 가져왔어요");
   }catch(error){
     showToast("올바른 People Canvas JSON 파일이 아니에요");
   }
@@ -463,7 +477,9 @@ interact(".person").draggable({
     end(e){
       e.target.classList.remove("dragging");document.querySelectorAll(".person").forEach(el=>el.classList.remove("drop-target"));
       const r=e.target.getBoundingClientRect(),target=[...document.elementsFromPoint(r.left+r.width/2,r.top+r.height/2)].find(el=>el.classList?.contains("person")&&el!==e.target);
-      if(target)group(e.target.dataset.id,target.dataset.id);else if(state.moved){pushHistory(state.dragStart);save()}
+      const detachedByShake=state.shake?.broken;
+      if(target&&!detachedByShake)group(e.target.dataset.id,target.dataset.id);
+      else if(state.moved){pushHistory(state.dragStart);settleLayoutChange(detachedByShake?"그룹에서 분리했어요":"카드를 이동했어요")}
       state.shake=null;
       setTimeout(()=>state.moved=false,0);
     }
@@ -493,14 +509,19 @@ document.querySelector("#toggleNotes").addEventListener("change",e=>{
   state.showNotes=e.target.checked;applyNotesVisibility();
   arrangeBoard({record:false,message:state.showNotes?"카드에 내부 메모를 표시했어요":"카드의 내부 메모를 숨겼어요"});
 });
+document.querySelector("#toggleAutoArrange").addEventListener("change",e=>{
+  state.autoArrange=e.target.checked;
+  if(state.autoArrange)arrangeBoard({record:false,message:"변경 후 자동 정렬을 켰어요"});
+  else{save();showToast("변경 후 자동 정렬을 껐어요")}
+});
 document.querySelector("#arrange").addEventListener("click",arrangeBoard);
-document.querySelector("#undo").addEventListener("click",()=>{const s=state.history.pop();if(!s)return showToast("되돌릴 변경이 없어요");const prev=JSON.parse(s);state.positions=prev.positions;state.groups=prev.groups;state.groupLabels=prev.groupLabels||{};state.groupColors=prev.groupColors||{};ensureGroupLabels();save();render();showToast("마지막 변경을 되돌렸어요")});
-document.querySelector("#reset").addEventListener("click",()=>{pushHistory(snapshot());state.groups={};state.groupLabels={};state.groupColors={};initialPositions();save();render();showToast("보드를 초기화했어요")});
+document.querySelector("#undo").addEventListener("click",()=>{const s=state.history.pop();if(!s)return showToast("되돌릴 변경이 없어요");const prev=JSON.parse(s);state.positions=prev.positions;state.groups=prev.groups;state.groupLabels=prev.groupLabels||{};state.groupColors=prev.groupColors||{};ensureGroupLabels();settleLayoutChange("마지막 변경을 되돌렸어요")});
+document.querySelector("#reset").addEventListener("click",()=>{pushHistory(snapshot());state.groups={};state.groupLabels={};state.groupColors={};initialPositions();settleLayoutChange("보드를 초기화했어요")});
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDrawer();if(e.key==="/"&&document.activeElement!==search){e.preventDefault();search.focus()}if((e.metaKey||e.ctrlKey)&&e.key==="z"){e.preventDefault();document.querySelector("#undo").click()}});
 addEventListener("resize",()=>{clearTimeout(window.resizeTimer);window.resizeTimer=setTimeout(()=>{Object.keys(state.positions).forEach(id=>state.positions[id]=clampPos(state.positions[id],id));render();save()},180)});
 const restored=load();
 if(!restored)initialPositions();
-reconcileState();applyNotesVisibility();render();
+reconcileState();applyNotesVisibility();applyAutoArrangeSetting();render();
 if(restored)save();
 
 export {};
