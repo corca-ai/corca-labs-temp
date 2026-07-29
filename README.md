@@ -40,7 +40,8 @@ npm run deploy:api
 ```
 
 The independent `deploy-worker.yml` workflow deploys it on backend changes.
-Configure `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` as repository
-secrets. A Worker deployment failure does not block GitHub Pages deployment,
-and an unavailable Worker causes the board to fall back to its URL-scoped local
-adapter.
+Configure `CLOUDFLARE_API_TOKEN` as a repository secret and
+`CLOUDFLARE_ACCOUNT_ID` as a repository variable. Until the token exists, the
+workflow still runs backend checks but safely skips deployment. A Worker
+deployment failure does not block GitHub Pages deployment, and an unavailable
+Worker causes the board to fall back to its URL-scoped local adapter.
