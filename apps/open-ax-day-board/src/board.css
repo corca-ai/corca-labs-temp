@@ -10,7 +10,7 @@
     :root.notes-visible { --card-height:224px; }
     * { box-sizing:border-box }
     #app { width:100%; height:100% }
-    .sync-status { order:5; min-width:max-content; padding:6px 9px; border-radius:99px; background:#e6e0d5; color:var(--muted); font-size:10px; font-weight:800 }
+    .sync-status { order:5; flex:0 0 88px; width:88px; box-sizing:border-box; padding:6px 7px; border-radius:99px; background:#e6e0d5; color:var(--muted); font-size:10px; font-weight:800; text-align:center; white-space:nowrap }
     .sync-status[data-status="synced"] { background:#d8eee8; color:#087467 }
     .sync-status[data-status="offline"] { background:#f9e2d6; color:#a34425 }
     .boot-failure { min-height:100vh; display:grid; place-content:center; gap:10px; padding:32px; text-align:center }
