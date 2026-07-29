@@ -9,6 +9,7 @@ import {
   UrlStateSizeWarning,
 } from "./url-state.js";
 import DOMPurify from "dompurify";
+import { toBlob, toPng } from "html-to-image";
 import { marked } from "marked";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api.js";
 import "monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution.js";
@@ -59,6 +60,14 @@ const COPY = {
     open: "MD 파일 불러오기",
     refresh: "새로고침",
     chooseAgain: "다시 선택",
+    copy: "클립보드에 복사",
+    copying: "복사 중…",
+    copied: "복사됨",
+    copyFailed: "복사 실패",
+    downloadPng: "PNG 다운로드",
+    preparingPng: "PNG 만드는 중…",
+    downloadedPng: "PNG 저장됨",
+    pngFailed: "PNG 저장 실패",
     print: "인쇄 / PDF 저장",
     fileInputLabel: "워크플로 Markdown 파일 선택",
     editorTitle: "Markdown 편집기",
@@ -95,6 +104,14 @@ const COPY = {
     open: "Load MD file",
     refresh: "Refresh",
     chooseAgain: "Choose again",
+    copy: "Copy to clipboard",
+    copying: "Copying…",
+    copied: "Copied",
+    copyFailed: "Copy failed",
+    downloadPng: "Download PNG",
+    preparingPng: "Creating PNG…",
+    downloadedPng: "PNG downloaded",
+    pngFailed: "PNG download failed",
     print: "Print / Save PDF",
     fileInputLabel: "Choose a workflow Markdown file",
     editorTitle: "Markdown editor",
@@ -146,7 +163,10 @@ const languageOptions =
   );
 const openButton = get.button("#open-button");
 const refreshButton = get.button("#refresh-button");
+const copyButton = get.button("#copy-button");
+const pngButton = get.button("#png-button");
 const printButton = get.button("#print-button");
+const exportStatus = get.element("#export-status");
 const fileInput =
   /** @type {HTMLInputElement} */ (document.querySelector("#file-input"));
 const dropZone = get.element("#drop-zone");
@@ -202,6 +222,14 @@ let currentStem = "workflow";
 let currentFilename = "";
 /** @type {string | undefined} */
 let programmaticEditorValue;
+/** @type {"default" | "working" | "success" | "error"} */
+let copyActionState = "default";
+/** @type {"default" | "working" | "success" | "error"} */
+let pngActionState = "default";
+/** @type {number | undefined} */
+let copyResetTimer;
+/** @type {number | undefined} */
+let pngResetTimer;
 
 const codeEditor = monaco.editor.create(editorHost, {
   value: "",
@@ -297,6 +325,7 @@ function applyTranslations() {
   languageSwitch.setAttribute("aria-label", copy.languageLabel);
   openButton.textContent = copy.open;
   refreshButton.textContent = fileHandle ? copy.refresh : copy.chooseAgain;
+  updateExportActionLabels();
   printButton.textContent = copy.print;
   fileInput.setAttribute("aria-label", copy.fileInputLabel);
   editorTitle.textContent = copy.editorTitle;
@@ -322,6 +351,61 @@ function applyTranslations() {
   document.title = currentStem === "workflow" ? copy.title : currentStem;
   updateStatus();
   renderErrorCopy();
+}
+
+function updateExportActionLabels() {
+  const copy = COPY[activeLanguage];
+  copyButton.textContent =
+    copyActionState === "working"
+      ? copy.copying
+      : copyActionState === "success"
+        ? copy.copied
+        : copyActionState === "error"
+          ? copy.copyFailed
+          : copy.copy;
+  pngButton.textContent =
+    pngActionState === "working"
+      ? copy.preparingPng
+      : pngActionState === "success"
+        ? copy.downloadedPng
+        : pngActionState === "error"
+          ? copy.pngFailed
+          : copy.downloadPng;
+}
+
+/**
+ * @param {"copy" | "png"} action
+ * @param {"default" | "working" | "success" | "error"} state
+ */
+function setExportActionState(action, state) {
+  if (action === "copy") copyActionState = state;
+  else pngActionState = state;
+  updateExportActionLabels();
+
+  const copy = COPY[activeLanguage];
+  exportStatus.textContent =
+    action === "copy"
+      ? state === "working"
+        ? copy.copying
+        : state === "success"
+          ? copy.copied
+          : state === "error"
+            ? copy.copyFailed
+            : ""
+      : state === "working"
+        ? copy.preparingPng
+        : state === "success"
+          ? copy.downloadedPng
+          : state === "error"
+            ? copy.pngFailed
+            : "";
+}
+
+/** @param {boolean} disabled */
+function setPreviewActionsDisabled(disabled) {
+  copyButton.disabled = disabled;
+  pngButton.disabled = disabled;
+  printButton.disabled = disabled;
 }
 
 /** @param {string} filename */
@@ -350,7 +434,7 @@ function updateRefreshUi() {
 function showError(problem, guidanceKey, detailKey, prefixKey) {
   currentError = { problem, guidanceKey, detailKey, prefixKey };
   errorPanel.hidden = false;
-  printButton.disabled = true;
+  setPreviewActionsDisabled(true);
   renderErrorCopy();
 }
 
@@ -459,6 +543,168 @@ function clearDiagramHighlight() {
   }
 }
 
+const CLIPBOARD_STYLE_PROPERTIES = [
+  "background-color",
+  "border",
+  "border-collapse",
+  "border-radius",
+  "color",
+  "font-family",
+  "font-size",
+  "font-style",
+  "font-weight",
+  "letter-spacing",
+  "line-height",
+  "list-style-position",
+  "list-style-type",
+  "margin",
+  "padding",
+  "text-align",
+  "text-decoration",
+  "vertical-align",
+  "white-space",
+];
+
+/**
+ * Preserve readable document formatting without copying viewer layout styles.
+ * @param {Element} source
+ * @param {Element} target
+ */
+function inlineClipboardStyles(source, target) {
+  if (
+    !(
+      target instanceof HTMLElement ||
+      target instanceof SVGElement
+    )
+  ) {
+    return;
+  }
+  const computed = getComputedStyle(source);
+  for (const property of CLIPBOARD_STYLE_PROPERTIES) {
+    target.style.setProperty(property, computed.getPropertyValue(property));
+  }
+  if (source.classList.contains("mermaid-diagram")) return;
+
+  const sourceChildren = Array.from(source.children);
+  const targetChildren = Array.from(target.children);
+  for (const [index, sourceChild] of sourceChildren.entries()) {
+    const targetChild = targetChildren[index];
+    if (targetChild) inlineClipboardStyles(sourceChild, targetChild);
+  }
+}
+
+/** @returns {Promise<Blob>} */
+async function renderDocumentPng() {
+  clearDiagramHighlight();
+  await document.fonts.ready;
+  const bounds = preview.getBoundingClientRect();
+  const padding = 32;
+  const width = Math.ceil(Math.max(bounds.width, preview.scrollWidth)) + padding * 2;
+  const height =
+    Math.ceil(Math.max(bounds.height, preview.scrollHeight)) + padding * 2;
+  const blob = await toBlob(preview, {
+    backgroundColor: "#ffffff",
+    cacheBust: true,
+    height,
+    pixelRatio: 2,
+    style: {
+      boxSizing: "border-box",
+      margin: "0",
+      maxWidth: "none",
+      minHeight: "0",
+      overflow: "visible",
+      padding: `${padding}px`,
+    },
+    width,
+  });
+  if (!blob) throw new Error("Could not render the document as PNG.");
+  return blob;
+}
+
+/** @returns {Promise<string>} */
+async function createClipboardHtml() {
+  clearDiagramHighlight();
+  await document.fonts.ready;
+  const clone = /** @type {HTMLElement} */ (preview.cloneNode(true));
+  inlineClipboardStyles(preview, clone);
+
+  const sourceDiagrams = Array.from(
+    preview.querySelectorAll(".mermaid-diagram"),
+  );
+  const cloneDiagrams = Array.from(
+    clone.querySelectorAll(".mermaid-diagram"),
+  );
+  const diagramImages = await Promise.all(
+    sourceDiagrams.map((diagram) =>
+      toPng(/** @type {HTMLElement} */ (diagram), {
+        backgroundColor: "#ffffff",
+        cacheBust: true,
+        pixelRatio: 2,
+      }),
+    ),
+  );
+  for (const [index, dataUrl] of diagramImages.entries()) {
+    const diagram = cloneDiagrams[index];
+    if (!diagram) continue;
+    const image = document.createElement("img");
+    image.src = dataUrl;
+    image.alt = "Rendered Mermaid diagram";
+    image.style.cssText =
+      "display:block;width:auto;max-width:100%;height:auto;margin:1.5em auto;";
+    diagram.replaceWith(image);
+  }
+
+  clone.removeAttribute("aria-label");
+  clone.style.cssText +=
+    "width:auto;max-width:900px;margin:0;padding:24px;background:#fff;";
+  return clone.outerHTML;
+}
+
+function copyPreviewSelection() {
+  const selection = window.getSelection();
+  if (!selection) throw new Error("Clipboard selection is unavailable.");
+  const previousRanges = Array.from(
+    { length: selection.rangeCount },
+    (_, index) => selection.getRangeAt(index).cloneRange(),
+  );
+  const range = document.createRange();
+  range.selectNodeContents(preview);
+  selection.removeAllRanges();
+  selection.addRange(range);
+  const copied = document.execCommand("copy");
+  selection.removeAllRanges();
+  for (const previousRange of previousRanges) selection.addRange(previousRange);
+  if (!copied) throw new Error("Clipboard copy was rejected.");
+}
+
+async function copyRenderedDocument() {
+  const plainText = preview.innerText;
+  if (navigator.clipboard?.write && "ClipboardItem" in window) {
+    const pngPromise = renderDocumentPng();
+    const htmlPromise = createClipboardHtml();
+    const item = new ClipboardItem({
+      "image/png": pngPromise,
+      "text/html": htmlPromise.then(
+        (html) => new Blob([html], { type: "text/html" }),
+      ),
+      "text/plain": new Blob([plainText], { type: "text/plain" }),
+    });
+    await navigator.clipboard.write([item]);
+    return;
+  }
+  copyPreviewSelection();
+}
+
+async function downloadRenderedPng() {
+  const blob = await renderDocumentPng();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.download = `${currentStem}.png`;
+  link.href = url;
+  link.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
 /**
  * @param {Element} diagram
  * @param {Element} selectedNode
@@ -503,6 +749,7 @@ function highlightDiagramNeighborhood(diagram, selectedNode) {
  */
 async function renderMarkdown(markdown, successMode, successTime) {
   const requestId = ++activeRender;
+  setPreviewActionsDisabled(true);
   if (!mermaid) {
     showError(
       new Error(COPY[activeLanguage].rendererLoading),
@@ -553,7 +800,7 @@ async function renderMarkdown(markdown, successMode, successTime) {
     } else {
       errorPanel.hidden = true;
       currentError = undefined;
-      printButton.disabled = false;
+      setPreviewActionsDisabled(false);
       setStatus(successMode, successTime);
     }
     updatePrintOrientation();
@@ -714,6 +961,46 @@ openButton.addEventListener("click", () => void chooseFile());
 refreshButton.addEventListener("click", () => {
   if (fileHandle) void readHandle();
   else chooseFallbackFile();
+});
+copyButton.addEventListener("click", async () => {
+  window.clearTimeout(copyResetTimer);
+  copyButton.disabled = true;
+  setExportActionState("copy", "working");
+  try {
+    await copyRenderedDocument();
+    setExportActionState("copy", "success");
+  } catch (problem) {
+    console.error(problem);
+    try {
+      copyPreviewSelection();
+      setExportActionState("copy", "success");
+    } catch (fallbackProblem) {
+      console.error(fallbackProblem);
+      setExportActionState("copy", "error");
+    }
+  } finally {
+    copyButton.disabled = printButton.disabled;
+    copyResetTimer = window.setTimeout(() => {
+      setExportActionState("copy", "default");
+    }, 1_800);
+  }
+});
+pngButton.addEventListener("click", async () => {
+  window.clearTimeout(pngResetTimer);
+  pngButton.disabled = true;
+  setExportActionState("png", "working");
+  try {
+    await downloadRenderedPng();
+    setExportActionState("png", "success");
+  } catch (problem) {
+    console.error(problem);
+    setExportActionState("png", "error");
+  } finally {
+    pngButton.disabled = printButton.disabled;
+    pngResetTimer = window.setTimeout(() => {
+      setExportActionState("png", "default");
+    }, 1_800);
+  }
 });
 printButton.addEventListener("click", () => {
   document.title = currentStem;

@@ -32,9 +32,16 @@
       </div>
 
       <div class="actions">
+        <button id="copy-button" class="button" type="button" disabled>
+          클립보드에 복사
+        </button>
+        <button id="png-button" class="button" type="button" disabled>
+          PNG 다운로드
+        </button>
         <button id="print-button" class="button" type="button" disabled>
           인쇄 / PDF 저장
         </button>
+        <span id="export-status" class="visually-hidden" role="status" aria-live="polite"></span>
       </div>
 
       <input
