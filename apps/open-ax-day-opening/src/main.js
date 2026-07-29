@@ -26,16 +26,22 @@ function responsesFor(slide) {
 }
 
 function updateResponses() {
-  const responses = responsesFor(currentSlide());
+  const slide = currentSlide();
+  const responses = responsesFor(slide);
+  const list = slide.querySelector(".responses");
+  const overview = responses.length > 0 && revealedCount === responses.length + 1;
+  list?.classList.toggle("is-overview", overview);
   responses.forEach((item, index) => {
-    const revealed = index < revealedCount;
+    const revealed = overview || index === revealedCount - 1;
     item.classList.toggle("is-revealed", revealed);
     item.setAttribute("aria-hidden", revealed ? "false" : "true");
   });
   revealPosition.hidden = responses.length === 0;
-  revealPosition.textContent = responses.length
-    ? `응답 ${revealedCount} / ${responses.length}`
-    : "";
+  revealPosition.textContent = overview
+    ? "전체 응답"
+    : responses.length
+      ? `응답 ${revealedCount} / ${responses.length}`
+      : "";
 }
 
 function updateControls() {
@@ -67,7 +73,7 @@ function initialSlide() {
 
 function advance() {
   const responses = responsesFor(currentSlide());
-  if (revealedCount < responses.length) {
+  if (revealedCount < responses.length + 1) {
     revealedCount += 1;
     updateControls();
     return;
@@ -83,7 +89,8 @@ function retreat() {
   }
   if (currentIndex > 0) {
     showSlide(currentIndex - 1);
-    revealedCount = responsesFor(currentSlide()).length;
+    const responses = responsesFor(currentSlide());
+    revealedCount = responses.length ? responses.length + 1 : 0;
     updateControls();
   }
 }

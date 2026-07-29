@@ -174,46 +174,80 @@ h1 {
 }
 
 .responses {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  align-content: center;
+  position: relative;
+  align-self: center;
+  width: 100%;
+  height: min(68vh, 620px);
   margin: 0;
   padding: 0;
   list-style: none;
   counter-reset: response;
-  border-top: 1px solid var(--line);
-  border-left: 1px solid var(--line);
 }
 
 .responses li {
-  min-height: clamp(120px, 18vh, 180px);
-  padding: clamp(16px, 2vw, 26px);
-  border-right: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-  font-size: clamp(15px, 1.35vw, 21px);
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: clamp(28px, 5vw, 72px);
+  border: 1px solid var(--line);
+  background: #fbfaf7;
+  font-size: clamp(32px, 4.2vw, 68px);
   font-weight: 600;
-  line-height: 1.55;
+  line-height: 1.24;
+  letter-spacing: -0.045em;
   counter-increment: response;
+  visibility: hidden;
   opacity: 0;
-  transform: translateY(6px);
+  transform: translateY(10px);
 }
 
 .is-active .responses li.is-revealed {
+  visibility: visible;
   opacity: 1;
   transform: translateY(0);
   transition:
     opacity 180ms ease,
-    transform 180ms ease;
+    transform 180ms ease,
+    visibility 180ms;
 }
 
 .responses li::before {
   display: block;
-  margin-bottom: 12px;
+  margin-bottom: auto;
   color: var(--muted);
   content: counter(response, decimal-leading-zero);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
+  line-height: 1;
   letter-spacing: 0.1em;
+}
+
+.responses.is-overview {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  height: auto;
+  border-top: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+}
+
+.responses.is-overview li {
+  position: relative;
+  inset: auto;
+  min-height: clamp(120px, 18vh, 180px);
+  padding: clamp(16px, 2vw, 26px);
+  border: 0;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  font-size: clamp(15px, 1.35vw, 21px);
+  line-height: 1.55;
+  letter-spacing: 0;
+}
+
+.responses.is-overview li::before {
+  margin-bottom: 12px;
 }
 
 .question-list {
@@ -357,11 +391,22 @@ h1 {
   }
 
   .responses {
-    grid-template-columns: 1fr;
+    height: 58svh;
   }
 
   .responses li {
+    padding: 28px;
+    font-size: clamp(27px, 8vw, 46px);
+  }
+
+  .responses.is-overview {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .responses.is-overview li {
     min-height: auto;
+    font-size: 16px;
   }
 
   .intro-grid {
